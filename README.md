@@ -70,14 +70,22 @@ pytest -q                             # wiring smoke test  (pip install pytest)
 ```
 
 `--dry-run` forces `backend = "fake"` for every model, so the whole pipeline runs
-end-to-end with no weights, no GPU, no downloads.
+end-to-end with no weights, no GPU, no downloads. This is the only thing meant to run on
+the laptop.
 
-## Running for real
+## Running for real (Kaggle)
+
+Real model runs happen in Kaggle notebooks (T4 GPU) — see `notebooks/`. Each milestone
+is one notebook that `git clone`s this repo and drives it:
+
+| Notebook | Milestone | Status |
+| --- | --- | --- |
+| `m1_model_backend.ipynb` | target model (`google/gemma-3-4b-it`) via `TransformersModelHandle` | ready to run |
+| _(m2)_ | perplexity scorer + defense Layer 1 + frozen AdvBench harmful set | next |
+
+Once M1 is validated and the target `revision` is pinned in `config.toml`:
 
 ```bash
-pip install -r requirements.txt       # after uncommenting the model backend deps
-# 1. implement core/models.py TransformersModelHandle (generate + perplexity), then freeze it
-# 2. set each [models.*] backend = "transformers" and pin every revision in config.toml
 python run_eval.py --attack all --defense off   # baseline ASR against the undefended target
 python run_eval.py --attack all --defense on    # the full evaluation pass
 ```

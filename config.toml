@@ -20,9 +20,9 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
 name           = "google/gemma-3-4b-it"   # small + genuinely safety-tuned; gated on HF (accept the licence)
-revision       = "PIN-ME"         # <- exact HF commit hash before the first real run
-backend        = "fake"           # fake | transformers | ollama
-dtype          = "bfloat16"
+revision       = "PIN-ME"         # <- exact HF commit hash; m1_model_backend.ipynb prints the current one
+backend        = "transformers"   # fake | transformers | ollama
+dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
 max_new_tokens = 512
 temperature    = 0.0              # greedy -> deterministic transcripts
 top_p          = 1.0

@@ -4,6 +4,10 @@ __pycache__/
 venv/
 .env
 .DS_Store
+.ipynb_checkpoints/
+
+# scratch goal files written by notebooks (e.g. m1 smoke test)
+datasets/_*.jsonl
 
 # per-machine config overrides
 config.local.toml

@@ -1,8 +1,9 @@
 """Model handles -- the shared contract between the attack battery and the defense stack.
 
-Both halves code against `ModelHandle`. The real backend is implemented ONCE (jointly,
-Week 11), then this file is frozen. Until then `backend = "fake"` gives every part of the
-repo something callable so wiring can be tested end to end (`run_eval.py --dry-run`).
+Both halves code against `ModelHandle`. `backend = "fake"` gives every part of the repo
+something callable with no weights (`run_eval.py --dry-run`, the wiring tests).
+`backend = "transformers"` is the real path -- validated on Kaggle, see
+notebooks/m1_model_backend.ipynb.
 
 Roles (keys under [models.*] in config.toml):
     target             the victim model
@@ -61,22 +62,119 @@ class FakeModelHandle(ModelHandle):
 
 
 class TransformersModelHandle(ModelHandle):
-    """HF Transformers backend.
+    """Hugging Face Transformers backend (milestone M1).
 
-    TODO(joint, Week 11) -- implement, then freeze this file:
-      generate():   load once (cache on the class), apply the chat template, greedy-decode
-                    with spec["temperature"] / spec["max_new_tokens"], honour `prefill` by
-                    seeding the assistant turn, return ONLY the newly generated tokens.
-      perplexity(): teacher-forced mean NLL over `text`; return exp(mean_nll). For the
-                    windowed variant (defense Layer 1) return the minimum over token windows
-                    of size config.defense.layer1_perplexity.window_size.
+    Loads the model once per (name, revision), cached on the class. Handles both plain
+    text models (AutoModelForCausalLM + AutoTokenizer) and text+vision models used
+    text-only (AutoModelForImageTextToText + AutoProcessor -- e.g. google/gemma-3-4b-it).
+
+    All heavy imports are lazy, so `backend = "fake"` / `--dry-run` never touch torch.
+
+    `perplexity()` is still a stub -- it lands in the defense Layer-1 milestone (it needs
+    a different model, `perplexity_scorer` / gpt2-large, not the target).
     """
 
+    _CACHE: dict = {}
+
+    def _revision(self):
+        rev = self.spec.get("revision")
+        return None if rev in (None, "", "PIN-ME") else rev
+
+    def _resolve_dtype(self):
+        import torch
+
+        want = str(self.spec.get("dtype", "auto")).lower()
+        if want in ("auto", ""):
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                return torch.bfloat16      # RTX 6000 etc.
+            return torch.float16           # T4 (Turing has no bf16 tensor cores)
+        return {"bfloat16": torch.bfloat16, "float16": torch.float16,
+                "float32": torch.float32}.get(want, torch.float16)
+
+    def _bundle(self):
+        key = (self.name, self._revision())
+        cached = TransformersModelHandle._CACHE.get(key)
+        if cached is not None:
+            return cached
+
+        import transformers as tf
+
+        load_kw = dict(revision=self._revision(), torch_dtype=self._resolve_dtype(), device_map="auto")
+        try:
+            tokenizer = tf.AutoTokenizer.from_pretrained(self.name, revision=self._revision())
+            model = tf.AutoModelForCausalLM.from_pretrained(self.name, **load_kw)
+            bundle = (model.eval(), tokenizer, None, "causal")
+        except Exception:  # noqa: BLE001 -- arch isn't a plain CausalLM (Gemma 3 4B, other VLMs)
+            processor = tf.AutoProcessor.from_pretrained(self.name, revision=self._revision())
+            model = tf.AutoModelForImageTextToText.from_pretrained(self.name, **load_kw)
+            bundle = (model.eval(), None, processor, "vlm")
+
+        TransformersModelHandle._CACHE[key] = bundle
+        return bundle
+
+    @staticmethod
+    def _fold_system(messages: list[Message]) -> list[Message]:
+        """Fold any system turn into the next user turn -- Gemma's chat template (and some
+        others) has no system slot. Models with a real system role lose the separation;
+        acceptable for the target, and the defense writeup should note it."""
+        out: list[Message] = []
+        sys_buf = ""
+        for m in messages:
+            if m["role"] == "system":
+                sys_buf += m["content"].strip() + "\n\n"
+            elif m["role"] == "user":
+                out.append({"role": "user", "content": (sys_buf + m["content"]) if sys_buf else m["content"]})
+                sys_buf = ""
+            else:
+                out.append(dict(m))
+        if sys_buf:
+            out.insert(0, {"role": "user", "content": sys_buf.strip()})
+        return out
+
+    def _gen_kwargs(self, overrides: dict) -> dict:
+        temperature = float(overrides.get("temperature", self.spec.get("temperature", 0.0)))
+        kw = dict(
+            max_new_tokens=int(overrides.get("max_new_tokens", self.spec.get("max_new_tokens", 512))),
+            do_sample=temperature > 0.0,
+        )
+        if kw["do_sample"]:
+            kw["temperature"] = temperature
+            kw["top_p"] = float(self.spec.get("top_p", 1.0))
+        return kw
+
     def generate(self, messages, *, prefill=None, **overrides) -> str:
-        raise NotImplementedError("Implement TransformersModelHandle, then freeze core/models.py")
+        import torch
+
+        model, tokenizer, processor, kind = self._bundle()
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+        messages = self._fold_system(messages)
+
+        if kind == "causal":
+            enc = tokenizer.apply_chat_template(
+                messages, add_generation_prompt=True, return_tensors="pt", return_dict=True,
+            ).to(model.device)
+            if prefill:
+                tail = tokenizer(prefill, add_special_tokens=False, return_tensors="pt").to(model.device)
+                enc["input_ids"] = torch.cat([enc["input_ids"], tail["input_ids"]], dim=-1)
+                enc["attention_mask"] = torch.cat([enc["attention_mask"], tail["attention_mask"]], dim=-1)
+            decode = tokenizer.decode
+        else:
+            chat = [{"role": m["role"], "content": [{"type": "text", "text": m["content"]}]} for m in messages]
+            enc = processor.apply_chat_template(
+                chat, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt",
+            ).to(model.device)
+            decode = processor.decode
+
+        enc.pop("token_type_ids", None)   # some templates emit it; generate() rejects it
+        prompt_len = enc["input_ids"].shape[-1]
+        with torch.no_grad():
+            out = model.generate(**enc, **self._gen_kwargs(overrides))
+        text = decode(out[0][prompt_len:], skip_special_tokens=True)
+        return (prefill + text) if (prefill and kind == "causal") else text
 
     def perplexity(self, text: str) -> float:
-        raise NotImplementedError("Implement TransformersModelHandle, then freeze core/models.py")
+        raise NotImplementedError("perplexity() lands in the defense Layer-1 milestone")
 
 
 _BACKENDS: dict[str, type[ModelHandle]] = {
