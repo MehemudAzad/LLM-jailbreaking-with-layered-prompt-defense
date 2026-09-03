@@ -1,0 +1,93 @@
+# ============================================================================
+# Tool 27 — LLM Jailbreak Battery + Layered Prompt Defense   (CSE-406, 2026)
+#
+# SINGLE SOURCE OF TRUTH for the reproducible demo. Every stochastic step in
+# this repo reads from here. Do NOT hard-code a model name or a seed anywhere
+# else. Per-machine overrides: copy this file to config.local.toml (git-ignored),
+# it is deep-merged on top of this one.
+#
+# Spec requirement: "Pin your models, datasets, and seeds so the demo is
+# reproducible." Fill every "PIN-ME" before the first real (non --dry-run) run.
+# ============================================================================
+
+seed = 1337                       # global RNG seed: random / numpy / torch
+
+# ---------------------------------------------------------------------------
+# Models. `backend = "fake"` loads no weights and is what --dry-run forces
+# everywhere, so both halves can test wiring from day one. Switch each role to
+# "transformers" (or "ollama") once core/models.py's real backend is implemented.
+# ---------------------------------------------------------------------------
+
+[models.target]                   # the "victim": attacked by the battery, protected by the stack
+name           = "Qwen/Qwen2.5-7B-Instruct"
+revision       = "PIN-ME"         # <- exact HF commit hash before the first real run
+backend        = "fake"           # fake | transformers | ollama
+dtype          = "bfloat16"
+max_new_tokens = 512
+temperature    = 0.0              # greedy -> deterministic transcripts
+top_p          = 1.0
+
+[models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
+name           = "Qwen/Qwen2.5-7B-Instruct"
+revision       = "PIN-ME"
+backend        = "fake"
+max_new_tokens = 256
+temperature    = 0.0
+
+[models.paraphraser]              # defense Layer 2 -- keep this DIFFERENT from the target
+name           = "HuggingFaceH4/zephyr-7b-beta"
+revision       = "PIN-ME"
+backend        = "fake"
+max_new_tokens = 512
+temperature    = 0.0
+instruction    = "paraphrase the following sentences:"   # fixed wording, from Jain et al.
+
+[models.perplexity_scorer]        # defense Layer 1 -- a small, frozen causal LM
+name           = "gpt2-large"
+revision       = "PIN-ME"
+backend        = "fake"
+
+[models.judge]                    # defense Layer 4 + automated grader (BAD_BOT / GOOD_BOT / UNCLEAR)
+name           = "Qwen/Qwen2.5-7B-Instruct"
+revision       = "PIN-ME"
+backend        = "fake"
+temperature    = 0.0
+
+# ---------------------------------------------------------------------------
+# Defense stack. Order is fixed in defense/__init__.py; toggles live here.
+# ---------------------------------------------------------------------------
+
+[defense.layer1_perplexity]
+enabled     = true
+enforce     = false               # STUB: score + log only. Flip to true after calibration.
+threshold   = 1000.0              # PLACEHOLDER log-perplexity -- recalibrate on the benign set
+windowed    = true
+window_size = 10                  # tokens
+
+[defense.layer2_paraphrase]
+enabled = true
+
+[defense.layer3_system_hardening]
+enabled            = true
+system_prompt_file = "defense/assets/hardened_system_prompt.txt"
+
+[defense.layer4_response_classifier]
+enabled = true
+enforce = true                    # block BAD_BOT responses from reaching the user
+
+# ---------------------------------------------------------------------------
+# Frozen datasets. Record the counts once frozen (Week 11).
+# ---------------------------------------------------------------------------
+
+[datasets]
+harmful       = "datasets/harmful_behaviors.jsonl"   # populate from AdvBench -- see datasets/README.md
+benign        = "datasets/benign_prompts.jsonl"      # calibration + benign-quality-drop measurement
+harmful_count = 0
+benign_count  = 0
+
+[paths]
+logs_dir = "logs"
+
+[runtime]
+device     = "auto"               # auto | cuda | mps | cpu
+batch_size = 1

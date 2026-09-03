@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool 27 — LLM Jailbreak Battery &amp; Layered Prompt Defense</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#10131a;
+    --panel:#161a23;
+    --panel-2:#1b202a;
+    --line:#272d3a;
+    --text:#e9e7e1;
+    --muted:#8991a3;
+    --attack:#d3452d;
+    --attack-dim:rgba(211,69,45,.14);
+    --attack-line:rgba(211,69,45,.4);
+    --defense:#3aa89d;
+    --defense-dim:rgba(58,168,157,.14);
+    --defense-line:rgba(58,168,157,.4);
+    --amber:#e0af3d;
+    --amber-dim:rgba(224,175,61,.14);
+    --radius:10px;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Space Grotesk',sans-serif;
+    line-height:1.15;
+    margin:0 0 .5em;
+    letter-spacing:-.01em;
+  }
+  p{margin:0 0 1em;color:var(--text);}
+  .muted{color:var(--muted);}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+  ::selection{background:var(--amber-dim);}
+
+  /* ---------- NAV ---------- */
+  .topnav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(16,19,26,.86);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .topnav-inner{
+    max-width:var(--maxw);margin:0 auto;padding:14px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  }
+  .brand{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);white-space:nowrap;}
+  .brand strong{color:var(--text);}
+  .navlinks{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;}
+  .navlinks::-webkit-scrollbar{display:none;}
+  .navlinks a{
+    font-size:13px;color:var(--muted);text-decoration:none;
+    padding:8px 10px;border-radius:6px;white-space:nowrap;
+    transition:color .15s, background .15s;
+  }
+  .navlinks a:hover{color:var(--text);background:var(--panel-2);}
+
+  /* ---------- HERO ---------- */
+  .hero{padding:72px 0 48px;border-bottom:1px solid var(--line);}
+  .tag{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);
+    background:var(--amber-dim);border:1px solid rgba(224,175,61,.35);
+    padding:5px 10px;border-radius:20px;margin-bottom:22px;
+  }
+  .hero h1{font-size:clamp(32px,5vw,52px);max-width:15ch;}
+  .hero .lede{max-width:56ch;font-size:17px;color:var(--muted);}
+  .stat-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px;}
+  .stat{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;min-width:170px;
+  }
+  .stat .k{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .stat .v{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;margin-top:4px;}
+  .signal{display:flex;gap:5px;margin-top:36px;}
+  .signal span{
+    width:26px;height:6px;border-radius:3px;background:var(--attack);
+    opacity:.35;animation:pulse 2.8s ease-in-out infinite;
+  }
+  .signal span:nth-child(1){animation-delay:0s;}
+  .signal span:nth-child(2){animation-delay:.15s;}
+  .signal span:nth-child(3){animation-delay:.3s;}
+  .signal span:nth-child(4){animation-delay:.45s;background:linear-gradient(90deg,var(--attack),var(--defense));}
+  .signal span:nth-child(5){animation-delay:.6s;background:var(--defense);}
+  .signal span:nth-child(6){animation-delay:.75s;background:var(--defense);}
+  @keyframes pulse{0%,100%{opacity:.25;}50%{opacity:1;}}
+  @media (prefers-reduced-motion:reduce){.signal span{animation:none;opacity:.8;}}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:56px 0;border-bottom:1px solid var(--line);}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);
+    margin-bottom:10px;
+  }
+  .eyebrow .n{color:var(--amber);}
+  section h2{font-size:clamp(24px,3vw,32px);max-width:20ch;}
+  section > .wrap > p.intro{max-width:62ch;color:var(--muted);}
+
+  /* callouts */
+  .callouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:24px;}
+  .callout{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;
+  }
+  .callout h4{font-size:15px;margin-bottom:6px;}
+  .callout p{font-size:14px;color:var(--muted);margin:0;}
+  .callout.warn{border-color:var(--amber-dim);background:linear-gradient(180deg,var(--amber-dim),transparent 60%);}
+
+  /* threat model two-up */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
+  @media (max-width:720px){.duo{grid-template-columns:1fr;}}
+  .duo-card{border-radius:var(--radius);padding:22px;border:1px solid var(--line);}
+  .duo-card.a{background:linear-gradient(180deg,var(--attack-dim),transparent 70%);border-color:var(--attack-line);}
+  .duo-card.b{background:linear-gradient(180deg,var(--defense-dim),transparent 70%);border-color:var(--defense-line);}
+  .duo-card .lbl{font-family:'IBM Plex Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  .duo-card.a .lbl{color:var(--attack);}
+  .duo-card.b .lbl{color:var(--defense);}
+  .duo-card h3{font-size:19px;}
+  .duo-card .ex{
+    margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+    background:rgba(0,0,0,.25);padding:10px 12px;border-radius:6px;color:var(--muted);
+  }
+
+  /* tabs (attack battery) */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 20px;}
+  .tab-btn{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+    background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:8px 14px;border-radius:20px;cursor:pointer;transition:all .15s;
+  }
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{background:var(--attack-dim);border-color:var(--attack-line);color:var(--text);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0;}to{opacity:1;}}
+  .atk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .atk-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;
+  }
+  .atk-card .name{font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--attack);margin-bottom:6px;}
+  .atk-card p{font-size:13.5px;color:var(--muted);margin:0;}
+  .atk-card .fig{
+    display:inline-block;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;
+    color:var(--amber);background:var(--amber-dim);padding:2px 8px;border-radius:12px;
+  }
+
+  /* defense pipeline */
+  .pipeline{display:flex;flex-direction:column;gap:0;margin-top:28px;}
+  .layer{
+    display:grid;grid-template-columns:64px 1fr;gap:18px;
+    padding:20px 0;border-top:1px dashed var(--line);position:relative;
+  }
+  .layer:first-child{border-top:none;}
+  .layer .num{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:var(--defense);
+    display:flex;align-items:flex-start;justify-content:center;padding-top:2px;
+  }
+  .layer h3{font-size:17px;margin-bottom:4px;}
+  .layer .src{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--defense);margin-bottom:8px;display:block;}
+  .layer .limit{
+    margin-top:10px;font-size:13px;color:var(--muted);
+    border-left:2px solid var(--attack-line);padding-left:12px;
+  }
+  .layer .limit b{color:var(--attack);font-weight:600;}
+  .kv-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .kv{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text);
+    background:var(--panel-2);border:1px solid var(--line);padding:4px 9px;border-radius:6px;
+  }
+
+  /* translator table */
+  table{width:100%;border-collapse:collapse;margin-top:22px;font-size:14px;}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:500;}
+  td.g{color:var(--muted);width:32%;}
+  td.l{color:var(--text);}
+
+  /* workflow accordion */
+  .phase{border-top:1px solid var(--line);}
+  .phase:last-child{border-bottom:1px solid var(--line);}
+  .phase-head{
+    width:100%;background:none;border:none;color:var(--text);cursor:pointer;
+    display:flex;align-items:center;gap:16px;padding:18px 0;text-align:left;font-family:inherit;
+  }
+  .phase-head .idx{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--muted);
+    min-width:34px;
+  }
+  .phase-head .ttl{flex:1;}
+  .phase-head .ttl .w{display:block;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--amber);margin-bottom:2px;}
+  .phase-head .ttl h4{font-size:16px;margin:0;}
+  .phase-head .chev{color:var(--muted);transition:transform .2s;font-size:14px;}
+  .phase.open .chev{transform:rotate(45deg);}
+  .phase-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .phase.open .phase-body{max-height:520px;}
+  .phase-body-inner{padding:0 0 22px 50px;display:flex;flex-wrap:wrap;gap:22px;}
+  .task-col{flex:1;min-width:220px;}
+  .task-col .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;margin-bottom:8px;display:block;}
+  .task-col.a .lbl{color:var(--attack);}
+  .task-col.b .lbl{color:var(--defense);}
+  .task-col ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--muted);}
+  .task-col li{margin-bottom:6px;}
+  .deadline-pill{
+    display:inline-block;margin-left:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    background:var(--amber-dim);color:var(--amber);padding:2px 8px;border-radius:10px;
+  }
+
+  /* checklist */
+  .checklists{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
+  @media (max-width:720px){.checklists{grid-template-columns:1fr;}}
+  .checklist-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;}
+  .checklist-card h4{font-size:15px;margin-bottom:2px;}
+  .checklist-card .when{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--amber);margin-bottom:14px;display:block;}
+  .cl-item{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;font-size:13.5px;}
+  .cl-item input{margin-top:3px;accent-color:var(--defense);}
+  .cl-item span{color:var(--muted);}
+  .cl-item input:checked ~ span{color:var(--text);text-decoration:line-through;text-decoration-color:var(--line);}
+
+  /* grading bar */
+  .gradebar{
+    display:flex;width:100%;height:38px;border-radius:8px;overflow:hidden;
+    border:1px solid var(--line);margin-top:26px;
+  }
+  .gseg{display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);font-weight:500;}
+  .gseg.design{width:20%;background:var(--defense);}
+  .gseg.impl{width:60%;background:var(--amber);}
+  .gseg.final{width:20%;background:#c9c4b8;}
+  .bonus-chip{
+    display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+    border:1px dashed var(--attack-line);color:var(--attack);
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:8px 14px;border-radius:20px;
+  }
+
+  /* team */
+  .team-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
+  @media (max-width:720px){.team-grid{grid-template-columns:1fr;}}
+  .member-card{border-radius:var(--radius);padding:20px 22px;border:1px solid var(--line);}
+  .member-card.a{background:linear-gradient(180deg,var(--attack-dim),transparent 60%);border-color:var(--attack-line);}
+  .member-card.b{background:linear-gradient(180deg,var(--defense-dim),transparent 60%);border-color:var(--defense-line);}
+  .member-card .role{font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;margin-bottom:6px;}
+  .member-card.a .role{color:var(--attack);}
+  .member-card.b .role{color:var(--defense);}
+  .member-card ul{margin:10px 0 0;padding-left:18px;font-size:13.5px;color:var(--muted);}
+  .member-card li{margin-bottom:6px;}
+  .repro{
+    margin-top:16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px 20px;
+  }
+  .repro h4{font-size:14px;margin-bottom:10px;}
+  .repro ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--muted);columns:2;column-gap:24px;}
+  .repro li{margin-bottom:8px;break-inside:avoid;}
+  @media (max-width:600px){.repro ul{columns:1;}}
+
+  /* references */
+  .refs{margin-top:20px;font-size:14px;}
+  .ref{padding:12px 0;border-top:1px solid var(--line);display:flex;gap:14px;}
+  .ref .idx{font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+  .ref .body b{font-weight:600;}
+  .ref .body .used{display:block;margin-top:2px;font-size:12.5px;color:var(--muted);}
+
+  footer{padding:32px 0 60px;}
+  footer p{color:var(--muted);font-size:13px;max-width:60ch;}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <div class="brand">CSE406 · <strong>PROJECT 27</strong></div>
+    <div class="navlinks">
+      <a href="#brief">Brief</a>
+      <a href="#threat-model">Threat Model</a>
+      <a href="#battery">Attack Battery</a>
+      <a href="#defense">Defense Stack</a>
+      <a href="#translator">Report Translator</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#checklist">Checklist</a>
+      <a href="#grading">Grading</a>
+      <a href="#team">Team</a>
+      <a href="#references">References</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">● Compressed schedule — everything due at once</span>
+    <h1>LLM Jailbreak Battery &amp; Layered Prompt Defense</h1>
+    <p class="lede">Tool 27 pairs a battery of prompt-based jailbreak techniques against a target
+    language model with a defense stack built from three papers. This page is the working
+    reference for both halves of the build, re-planned around a single combined deadline.</p>
+    <div class="stat-row">
+      <div class="stat"><div class="k">Right now</div><div class="v">Week 10</div></div>
+      <div class="stat"><div class="k">Design + Final Report + Demo</div><div class="v">Week 13, Sat</div></div>
+      <div class="stat"><div class="k">Bonus for own defense</div><div class="v">+10%</div></div>
+    </div>
+    <div class="callout warn" style="margin-top:24px;max-width:56ch;">
+      <h4>Both reports land on the same day</h4>
+      <p>Normally the Design Report is due two weeks before the Final Report. Here they're due
+      together on Saturday of week 13, which means you can't write the Design Report from a
+      finished build and the Final Report from finished results in sequence — you have to run
+      evaluation early enough that both reports draw from the same, single evaluation pass. The
+      workflow below is re-sequenced for that.</p>
+    </div>
+    <div class="signal" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- BRIEF -->
+  <section id="brief">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">00</span> · Mission brief</div>
+      <h2>What the course spec actually requires</h2>
+      <p class="intro">The general project rules were written with the network-layer attacks
+      (ARP spoofing, DoS, etc.) in mind, but three clauses apply directly to Tool 27.</p>
+      <div class="callouts">
+        <div class="callout">
+          <h4>Build it yourself</h4>
+          <p>You must implement the core attack and the defense yourself — no ready-made
+          attack library such as Foolbox, ART, or TextAttack for the graded attack.</p>
+        </div>
+        <div class="callout">
+          <h4>Frameworks are fine</h4>
+          <p>Standard frameworks and pretrained models — PyTorch, scikit-learn, Hugging Face,
+          Ollama — are allowed as the environment your own code runs in.</p>
+        </div>
+        <div class="callout warn">
+          <h4>Pin everything</h4>
+          <p>Pin your target model, paraphraser model, datasets, and random seeds so the
+          demo is reproducible on demand.</p>
+        </div>
+        <div class="callout">
+          <h4>Two of you, one report</h4>
+          <p>Work with your group member and state clearly in the report who was
+          responsible for which part.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THREAT MODEL -->
+  <section id="threat-model">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">01</span> · Threat model</div>
+      <h2>Two failure modes explain the whole battery</h2>
+      <p class="intro">Wei et al. argue every jailbreak in the battery reduces to one of two
+      root causes in how safety training interacts with the base model.</p>
+      <div class="duo">
+        <div class="duo-card a">
+          <div class="lbl">Failure mode 1</div>
+          <h3>Competing objectives</h3>
+          <p>Pretraining and instruction-following push the model to comply; safety training
+          pushes it to refuse. Attacks that win this tug-of-war exploit the conflict directly.</p>
+          <div class="ex">prefix_injection → force the reply to start with<br>"Absolutely! Here's" so a refusal can't lead</div>
+        </div>
+        <div class="duo-card b">
+          <div class="lbl">Failure mode 2</div>
+          <h3>Mismatched generalization</h3>
+          <p>Safety fine-tuning only covers natural-language prompts. Inputs that are
+          in-distribution for pretraining but out-of-distribution for safety data slip past it.</p>
+          <div class="ex">base64 → the harmful request survives in the<br>base model's knowledge, not in the safety data</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ATTACK BATTERY -->
+  <section id="battery">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">02</span> · Attack battery</div>
+      <h2>The techniques to implement, grouped by mechanism</h2>
+      <p class="intro">This is a curated subset of the Wei et al. catalogue. Figures shown are
+      the highest reported BAD BOT rate on GPT-4 or Claude v1.3 from their evaluation, for scale
+      — your own numbers will depend on your target model.</p>
+
+      <div class="tabs" id="atk-tabs">
+        <button class="tab-btn active" data-tab="encode">Encoding &amp; obfuscation</button>
+        <button class="tab-btn" data-tab="persona">Persona &amp; roleplay</button>
+        <button class="tab-btn" data-tab="inject">Injection &amp; formatting</button>
+        <button class="tab-btn" data-tab="assist">Model-assisted</button>
+        <button class="tab-btn" data-tab="combo">Combination &amp; adaptive</button>
+      </div>
+
+      <div class="tab-panel active" data-panel="encode">
+        <div class="atk-grid">
+          <div class="atk-card"><div class="name">base64 / base64_raw</div><p>Encode the request (and optionally decode the reply) so the harmful instruction never appears as natural-language text.</p><span class="fig">up to 66% BAD BOT</span></div>
+          <div class="atk-card"><div class="name">base64_input_only / output_only</div><p>Ablations that encode only one side of the exchange, isolating which direction the safety filter actually watches.</p></div>
+          <div class="atk-card"><div class="name">rot13</div><p>Simple substitution cipher; weak on its own, useful as a combination-attack ingredient.</p></div>
+          <div class="atk-card"><div class="name">leetspeak</div><p>Character substitution (a→4, e→3 …) that keeps the text human-readable but token-distorted.</p></div>
+          <div class="atk-card"><div class="name">disemvowel</div><p>Strip vowels from the harmful request to push it outside the safety training distribution.</p></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="persona">
+        <div class="atk-grid">
+          <div class="atk-card"><div class="name">evil_confidant</div><p>Roleplay frame in which the model plays an amoral confidant persona with no restrictions.</p></div>
+          <div class="atk-card"><div class="name">AIM</div><p>Top-voted jailbreakchat.com persona prompt; effectively a hand-tuned combination attack.</p><span class="fig">up to 86% BAD BOT (GPT-4)</span></div>
+          <div class="atk-card"><div class="name">dev_mode_v2 / dev_mode_with_rant</div><p>"Developer mode" framing that claims to unlock an unfiltered output mode.</p></div>
+          <div class="atk-card"><div class="name">wikipedia / wikipedia_with_title</div><p>Reframes the harmful ask as writing a neutral encyclopedia article on the topic.</p></div>
+          <div class="atk-card"><div class="name">poems</div><p>Reframes the request as a creative-writing / poetic form.</p></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="inject">
+        <div class="atk-grid">
+          <div class="atk-card"><div class="name">prefix_injection</div><p>Forces the answer to begin with an affirmative string, structurally blocking a refusal opener.</p></div>
+          <div class="atk-card"><div class="name">prefix_injection_hello</div><p>Ablation with a neutral prefix — confirms the specific chosen prefix is what matters.</p></div>
+          <div class="atk-card"><div class="name">refusal_suppression</div><p>Explicit instruction never to use refusal language ("cannot", "sorry", "unable").</p></div>
+          <div class="atk-card"><div class="name">refusal_suppression_inv</div><p>Inverse-phrased ablation, used to isolate the effect of the exact suppression wording.</p></div>
+          <div class="atk-card"><div class="name">style_injection_json / _short</div><p>Constrains the output format so the model can't produce a long templated refusal.</p></div>
+          <div class="atk-card"><div class="name">distractors / distractors_negated</div><p>Buries the harmful request among benign ones to dilute the safety objective's attention.</p></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="assist">
+        <div class="atk-grid">
+          <div class="atk-card"><div class="name">auto_payload_splitting</div><p>Uses a helper LLM to flag sensitive tokens, then splits/reassembles them programmatically.</p></div>
+          <div class="atk-card"><div class="name">auto_obfuscation</div><p>Uses a helper LLM to invent a novel obfuscation of the prompt on the fly.</p></div>
+          <div class="atk-card"><div class="name">few_shot_json</div><p>Primes the model with compliant-looking example turns before the real request.</p></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="combo">
+        <div class="atk-grid">
+          <div class="atk-card"><div class="name">combination_1</div><p>prefix injection + refusal suppression + base64, stacked in one prompt.</p></div>
+          <div class="atk-card"><div class="name">combination_2</div><p>combination_1 plus a style-injection constraint on the output format.</p></div>
+          <div class="atk-card"><div class="name">combination_3</div><p>combination_2 plus a fake "website content" framing — the strongest single attack tested.</p><span class="fig">up to 94% BAD BOT</span></div>
+          <div class="atk-card"><div class="name">adaptive attack</div><p>Run the whole battery per prompt; counts as a success if any single member succeeds. This is the project's actual "battery" strategy.</p><span class="fig">96–100% BAD BOT</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEFENSE STACK -->
+  <section id="defense">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">03</span> · Defense stack</div>
+      <h2>Four layers, each catching what the last one misses</h2>
+      <p class="intro">No single defense from the papers stops the whole battery. Layering
+      them — and adding your own hardening layer — is the actual design contribution the
+      report is asking for.</p>
+
+      <div class="pipeline">
+        <div class="layer">
+          <div class="num">1</div>
+          <div>
+            <span class="src">Jain et al. · Alon &amp; Kamfonas — detection</span>
+            <h3>Perplexity filter (plain + windowed)</h3>
+            <p class="muted" style="font-size:14px;">Score each prompt's log-perplexity under a
+            scorer model. Reject if it exceeds a threshold calibrated on your own benign set;
+            the windowed variant also scores contiguous chunks so a locally anomalous
+            adversarial suffix can't hide inside an otherwise fluent prompt.</p>
+            <div class="kv-row">
+              <span class="kv">threshold ≈ 997–1000 log-ppl</span>
+              <span class="kv">window size ≈ 10 tokens</span>
+              <span class="kv">false-positive rate ≈ 6–10%</span>
+            </div>
+            <div class="limit"><b>Blind spot:</b> it's a gibberish detector, not a jailbreak
+            detector. Fluent, human-authored attacks — AIM, roleplay, prefix injection — pass
+            straight through because nothing about their token statistics looks abnormal.</div>
+          </div>
+        </div>
+
+        <div class="layer">
+          <div class="num">2</div>
+          <div>
+            <span class="src">Jain et al. — preprocessing</span>
+            <h3>Paraphrase preprocessing</h3>
+            <p class="muted" style="font-size:14px;">Route every prompt through a second,
+            separate model with a fixed "paraphrase the following sentences:" instruction
+            before it ever reaches the target model, disrupting attacks that depend on an
+            exact, brittle token sequence.</p>
+            <div class="kv-row">
+              <span class="kv">≈15× fewer successful attacks in original study</span>
+              <span class="kv">10–15% benign-quality drop</span>
+            </div>
+            <div class="limit"><b>Blind spot:</b> paraphrasing preserves meaning, so
+            persona/roleplay attacks and distractor framing survive intact. Also only
+            gray-box safe — an attacker with white-box access to the paraphraser can chain
+            optimizers against it.</div>
+          </div>
+        </div>
+
+        <div class="layer">
+          <div class="num">3</div>
+          <div>
+            <span class="src">your design — instruction hardening</span>
+            <h3>System-level reinforcement</h3>
+            <p class="muted" style="font-size:14px;">An explicit instruction-hierarchy
+            reminder and refusal-priming in the system prompt, plus a constrained output
+            schema, aimed squarely at the competing-objectives attacks the first two layers
+            can't see.</p>
+            <div class="limit"><b>Why it's here:</b> this is the piece you design and justify
+            yourselves — it's what the "did you design any countermeasure" report question
+            and the 10% bonus are actually asking for.</div>
+          </div>
+        </div>
+
+        <div class="layer">
+          <div class="num">4</div>
+          <div>
+            <span class="src">your design — output-side check</span>
+            <h3>Response classification</h3>
+            <p class="muted" style="font-size:14px;">Scan the model's own reply for signs of
+            compliance with a harmful request — a lightweight version of the
+            BAD BOT / GOOD BOT / UNCLEAR labeling Wei et al. use to grade attacks — before it
+            ever reaches the user.</p>
+            <div class="limit"><b>Why it's here:</b> a last line of defense for whatever gets
+            through layers 1–3, and it doubles as your automated grader for the evaluation
+            phase of the workflow below.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRANSLATOR -->
+  <section id="translator">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">04</span> · Report translator</div>
+      <h2>Mapping the network-attack template onto an LLM attack</h2>
+      <p class="intro">The Design and Final Report templates were written for packet-level
+      attacks. Here's how each required item maps onto Tool 27 so nothing gets lost in
+      translation.</p>
+      <table>
+        <thead><tr><th>Template asks for</th><th>What you actually write</th></tr></thead>
+        <tbody>
+          <tr><td class="g">Topology diagram</td><td class="l">System/data-flow diagram: user → attacker prompt → [Layer 1 filter → Layer 2 paraphrase → Layer 3 hardened system prompt] → target ("victim") LLM → Layer 4 output check → response.</td></tr>
+          <tr><td class="g">Timing diagram of protocol + attack</td><td class="l">Pipeline/sequence diagram comparing an undefended request/response against the same prompt moving through each defense layer, showing exactly where it's intercepted, transformed, or rejected.</td></tr>
+          <tr><td class="g">Packet / frame details, header modifications</td><td class="l">Per-attack prompt structure breakdown — the exact prefix, suffix, encoding, or persona wrapper added to the base harmful instruction — and how each defense layer transforms that prompt in turn.</td></tr>
+          <tr><td class="g">Justification for the design</td><td class="l">Why perplexity + paraphrase + hardening + output-check together cover both failure modes (competing objectives and mismatched generalization), with the cited numbers from the three papers as evidence.</td></tr>
+          <tr><td class="g">Attacker PC / victim PC / server</td><td class="l">Attacker = your battery script. Victim = the pinned target model. Server = the paraphraser/detector gateway sitting in front of the victim model.</td></tr>
+          <tr><td class="g">Snapshots of victim screen</td><td class="l">Captured request/response logs and console output for each attack, pre- and post-defense.</td></tr>
+          <tr><td class="g">Countermeasure</td><td class="l">Your Layer 3 + Layer 4 design, written up as the bonus-eligible defense mechanism.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- WORKFLOW -->
+  <section id="workflow">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">05</span> · Workflow</div>
+      <h2>Four sprints, week 10 to week 13 Saturday</h2>
+      <p class="intro">With ~3.5 weeks left and both reports due on the same day, there's no
+      room for the old sequence of build-everything-then-write-everything. Build breadth-first,
+      run your one full evaluation pass by the middle of week 12, and write both reports off
+      that single pass. Click a sprint to expand it.</p>
+
+      <div id="workflow-accordion">
+
+        <div class="phase open">
+          <button class="phase-head">
+            <span class="idx">01</span>
+            <span class="ttl"><span class="w">Now → end of Week 10</span><h4>Lock scope, stand up both skeletons</h4></span>
+            <span class="chev">+</span>
+          </button>
+          <div class="phase-body"><div class="phase-body-inner">
+            <div class="task-col a"><span class="lbl">Attack side</span><ul>
+              <li>Pin the target ("victim") model and its exact version/checkpoint today</li>
+              <li>Trim the battery to ~8–10 techniques, one per category — depth later, not now</li>
+              <li>Stub every technique as a function, even crudely, so the harness has something to call</li>
+            </ul></div>
+            <div class="task-col b"><span class="lbl">Defense side</span><ul>
+              <li>Pin the perplexity-scorer model and the paraphraser model</li>
+              <li>Stub Layer 1 with the paper's reported threshold as a placeholder — calibrate for real later</li>
+              <li>Stub Layers 2–4 as pass-through functions so the pipeline shape exists end to end</li>
+            </ul></div>
+          </div></div>
+        </div>
+
+        <div class="phase">
+          <button class="phase-head">
+            <span class="idx">02</span>
+            <span class="ttl"><span class="w">Week 11 (Mon–Sun)</span><h4>Build to one working end-to-end pipeline</h4></span>
+            <span class="chev">+</span>
+          </button>
+          <div class="phase-body"><div class="phase-body-inner">
+            <div class="task-col a"><span class="lbl">Attack side</span><ul>
+              <li>Finish every technique implementation and the adaptive-attack harness</li>
+              <li>Run a first battery pass against the undefended target for a baseline ASR by Friday</li>
+              <li>Freeze the battery Sunday night — no new techniques after this</li>
+            </ul></div>
+            <div class="task-col b"><span class="lbl">Defense side</span><ul>
+              <li>Calibrate the perplexity threshold on your own benign set, replacing the placeholder</li>
+              <li>Finish Layers 2–4 for real and wire all four into one pipeline in front of the target</li>
+              <li>Smoke-test the full pipeline on a handful of prompts by Sunday night</li>
+            </ul></div>
+            <div class="task-col"><span class="lbl" style="color:var(--amber);">Report side</span><ul>
+              <li>Start the Design Report now: draft the topology diagram and attack definitions from what's already built</li>
+              <li>Don't wait for final numbers — the shape of the report can exist before the data does</li>
+            </ul></div>
+          </div></div>
+        </div>
+
+        <div class="phase">
+          <button class="phase-head">
+            <span class="idx">03</span>
+            <span class="ttl"><span class="w">Week 12 (Mon–Sun)</span><h4>The one full evaluation pass, then both first drafts</h4></span>
+            <span class="chev">+</span>
+          </button>
+          <div class="phase-body"><div class="phase-body-inner">
+            <div class="task-col a"><span class="lbl">Both, by Wed</span><ul>
+              <li>Run the full battery against the full defense stack — per-attack ASR, before and after</li>
+              <li>Measure benign pass-through and quality drop as your cost-of-defense numbers</li>
+              <li>Save every raw transcript now; this is the evidence base for both reports and the demo</li>
+            </ul></div>
+            <div class="task-col b"><span class="lbl">Thu–Sun</span><ul>
+              <li>Write first complete drafts of <b style="color:var(--text);">both</b> the Design Report and the Final Report from this one pass</li>
+              <li>Script the live demo and start capturing clean snapshots of attacker/victim output</li>
+            </ul></div>
+          </div>
+          <div class="phase-body-inner" style="padding-top:0;">
+            <div class="callout warn" style="width:100%;">
+              <h4>This is the only run both reports draw from</h4>
+              <p>Budget any re-run time here, not in week 13 — week 13 is for writing and rehearsal, not debugging the pipeline.</p>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="phase">
+          <button class="phase-head">
+            <span class="idx">04</span>
+            <span class="ttl"><span class="w">Week 13 (Mon–Sat) <span class="deadline-pill">Design + Final Report + Demo due Sat</span></span><h4>Polish, rehearse, submit</h4></span>
+            <span class="chev">+</span>
+          </button>
+          <div class="phase-body"><div class="phase-body-inner">
+            <div class="task-col a"><span class="lbl">Mon–Tue</span><ul>
+              <li>Finish writing both reports; cross-check each against the Report Translator table above</li>
+              <li>Confirm both members' contributions are named clearly in both reports</li>
+            </ul></div>
+            <div class="task-col b"><span class="lbl">Wed–Thu</span><ul>
+              <li>Rehearse the full live demo twice, end to end, on the actual pinned setup</li>
+              <li>Fix anything that breaks in rehearsal — this is your last safe window to touch code</li>
+            </ul></div>
+            <div class="task-col" style="flex:1;min-width:220px;"><span class="lbl" style="color:var(--amber);">Fri–Sat</span><ul>
+              <li>Friday: buffer day — proofread both reports, run the Deliverables Checklist below top to bottom</li>
+              <li>Saturday: submit the Design Report, Final Report, and demo together</li>
+            </ul></div>
+          </div></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- CHECKLIST -->
+  <section id="checklist">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">06</span> · Deliverables checklist</div>
+      <h2>Every required section, ready to tick off</h2>
+      <p class="intro">Both cards below now share one deadline — Saturday, week 13 — so treat
+      this as a single submission with two documents, not two separate deadlines.</p>
+      <div class="checklists">
+        <div class="checklist-card">
+          <h4>Design Report</h4>
+          <span class="when">Due · Week 13, Sat (with everything else) · 20% of grade</span>
+          <label class="cl-item"><input type="checkbox"><span>Definition of the attack, with a system/topology diagram</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Timing/pipeline diagram — baseline vs. each defense layer</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Prompt-structure ("packet") details per attack and per defense transform</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Justification for why the layered design should work</span></label>
+        </div>
+        <div class="checklist-card">
+          <h4>Final Report &amp; Demo</h4>
+          <span class="when">Due · Week 13, Sat (with everything else) · 20% report + 60% demo</span>
+          <label class="cl-item"><input type="checkbox"><span>Steps of the attack with snapshots of console / model output</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Was it successful — and a reasoned answer for why or why not</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Observed output at attacker, victim model, and gateway/server</span></label>
+          <label class="cl-item"><input type="checkbox"><span>Countermeasure design writeup — eligible for the +10% bonus</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GRADING -->
+  <section id="grading">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">07</span> · Grading breakdown</div>
+      <h2>Where the marks actually come from</h2>
+      <div class="gradebar">
+        <div class="gseg design">Design 20%</div>
+        <div class="gseg impl">Implementation &amp; Demo 60%</div>
+        <div class="gseg final">Final Report 20%</div>
+      </div>
+      <div class="bonus-chip">+ up to 10% bonus for a designed &amp; implemented defense mechanism</div>
+      <p class="muted" style="margin-top:16px;font-size:13.5px;">All three components — design
+      report, implementation/demo, final report — are graded independently but now land on the
+      same submission day, so there's no partial credit for finishing one late and hoping to
+      catch up on the next.</p>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section id="team">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">08</span> · Team &amp; reproducibility</div>
+      <h2>Split the work, then pin the run</h2>
+      <div class="team-grid">
+        <div class="member-card a">
+          <div class="role">Member A — Attack lead</div>
+          <ul>
+            <li>Owns the battery implementation and adaptive-attack harness</li>
+            <li>Owns the harmful-prompt / benign-prompt datasets</li>
+            <li>Owns baseline ASR measurement against the undefended target</li>
+          </ul>
+        </div>
+        <div class="member-card b">
+          <div class="role">Member B — Defense lead</div>
+          <ul>
+            <li>Owns Layers 1–2 (perplexity filter, paraphraser)</li>
+            <li>Owns Layers 3–4 (hardening, output check) with joint design input</li>
+            <li>Owns false-positive / quality-drop measurement on the benign set</li>
+          </ul>
+        </div>
+      </div>
+      <div class="repro">
+        <h4>Reproducibility checklist — pin before your first real run</h4>
+        <ul>
+          <li>Target model name, provider, and exact version/checkpoint</li>
+          <li>Paraphraser model name and version</li>
+          <li>Perplexity scorer model name and version</li>
+          <li>Random seeds for every stochastic step</li>
+          <li>Frozen harmful-prompt set (with a count)</li>
+          <li>Frozen benign-prompt set (with a count)</li>
+          <li>Library / framework versions (PyTorch, Transformers, etc.)</li>
+          <li>Raw transcripts saved for every attack × defense combination</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- REFERENCES -->
+  <section id="references" style="border-bottom:none;">
+    <div class="wrap">
+      <div class="eyebrow"><span class="n">09</span> · References</div>
+      <h2>The three assigned papers, plus the attack they all respond to</h2>
+      <div class="refs">
+        <div class="ref">
+          <div class="idx">[1]</div>
+          <div class="body"><b>Wei, Haghtalab &amp; Steinhardt (2023)</b> — Jailbroken: How Does LLM Safety Training Fail?
+            <span class="used">Source for the battery of jailbreak techniques and the competing-objectives / mismatched-generalization framing.</span></div>
+        </div>
+        <div class="ref">
+          <div class="idx">[2]</div>
+          <div class="body"><b>Jain et al. (2023)</b> — Baseline Defenses for Adversarial Attacks Against Aligned Language Models
+            <span class="used">Source for the perplexity filter (plain + windowed) and the paraphrase preprocessing defense.</span></div>
+        </div>
+        <div class="ref">
+          <div class="idx">[3]</div>
+          <div class="body"><b>Alon &amp; Kamfonas (2023)</b> — Detecting Language Model Attacks with Perplexity
+            <span class="used">Source for the two-feature (perplexity + length) classifier and its threshold calibration.</span></div>
+        </div>
+        <div class="ref">
+          <div class="idx">[4]</div>
+          <div class="body"><b>Zou et al. (2023)</b> — Universal and Transferable Adversarial Attacks on Aligned Language Models
+            <span class="used">The optimizer-based (GCG) suffix attack that [2] and [3] use as their defense testbed — useful context, not part of the assigned battery.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built from the CSE406 Project 2026 spec and the three assigned papers, re-sequenced for
+    a combined submission on Saturday of week 13. Numbers quoted throughout are from the
+    papers' own reported results and will shift once you run the battery against your own
+    pinned target model — treat them as expectations to check against, not guarantees.</p>
+  </div>
+</footer>
+
+<script>
+  // Attack battery tabs
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelector('.tab-panel[data-panel="'+btn.dataset.tab+'"]').classList.add('active');
+    });
+  });
+
+  // Workflow accordion
+  document.querySelectorAll('.phase-head').forEach(head=>{
+    head.addEventListener('click',()=>{
+      const phase = head.parentElement;
+      const wasOpen = phase.classList.contains('open');
+      document.querySelectorAll('.phase').forEach(p=>p.classList.remove('open'));
+      if(!wasOpen){ phase.classList.add('open'); }
+    });
+  });
+</script>
+
+</body>
+</html>

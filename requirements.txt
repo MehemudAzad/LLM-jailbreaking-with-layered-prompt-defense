@@ -1,0 +1,18 @@
+# --dry-run needs nothing outside the standard library (Python >= 3.11 for tomllib).
+# tomli>=2.0 ; python_version < "3.11"        # config parsing on older Pythons
+
+# Optional: makes core/seed.py able to seed NumPy too.
+numpy>=1.26
+
+# Dev / CI.
+pytest>=8.0
+
+# ---------------------------------------------------------------------------
+# Model backend. Uncomment and PIN EXACT versions when core/models.py's
+# TransformersModelHandle is implemented (Week 11 in the workflow). Pinned
+# versions are part of the reproducibility requirement.
+# ---------------------------------------------------------------------------
+# torch==2.4.0
+# transformers==4.44.2
+# accelerate==0.34.2
+# sentencepiece==0.2.0

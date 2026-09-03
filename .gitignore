@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.DS_Store
+
+# per-machine config overrides
+config.local.toml
+
+# downloaded weights / caches
+models/
+*.safetensors
+*.gguf
+.hf_cache/
+
+# run transcripts: keep the folder + its README, ignore the runs themselves.
+# For the final evaluation pass, force-add the run dir as report evidence:
+#   git add -f logs/<run-id>
+logs/*
+!logs/.gitkeep
+!logs/README.md
