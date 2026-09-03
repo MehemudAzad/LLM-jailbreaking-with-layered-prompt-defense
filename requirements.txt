@@ -8,11 +8,11 @@ numpy>=1.26
 pytest>=8.0
 
 # ---------------------------------------------------------------------------
-# Model backend. Uncomment and PIN EXACT versions when core/models.py's
-# TransformersModelHandle is implemented (Week 11 in the workflow). Pinned
-# versions are part of the reproducibility requirement.
+# Model backend (Kaggle GPU). The notebooks install these; pin exact versions
+# here once a run is reproduced end to end.
 # ---------------------------------------------------------------------------
-# torch==2.4.0
-# transformers==4.44.2
-# accelerate==0.34.2
-# sentencepiece==0.2.0
+# torch                    # preinstalled on Kaggle
+# transformers>=4.50       # Qwen3.5-9B (Feb 2026) needs a recent build -- notebooks use -U
+# accelerate>=0.30
+# bitsandbytes>=0.43       # nf4 4-bit for the Qwen3.5-9B judge (M4)
+# sentencepiece

@@ -81,9 +81,12 @@ class TransformersModelHandle(ModelHandle):
 
     All heavy imports are lazy, so `backend = "fake"` / `--dry-run` never touch torch.
 
-    `generate()` is milestone M1; `perplexity()` (teacher-forced NLL, plain + windowed)
-    is milestone M2 -- used by defense Layer 1, typically with a small scorer model
-    (`perplexity_scorer` / gpt2-large), not the target.
+    Optional model-spec keys (config.toml `[models.*]`):
+      device   "cuda:0" / "cuda:1" -- pin to one GPU (default: device_map="auto")
+      quant    "4bit"              -- bitsandbytes nf4 (e.g. the Qwen3.5-9B judge)
+      thinking false               -- Qwen3/3.5: disable the reasoning block
+
+    `generate()` = M1; `perplexity()` = M2; `quant`/`device`/`thinking` = M4 (judge).
     """
 
     _CACHE: dict = {}
@@ -103,6 +106,20 @@ class TransformersModelHandle(ModelHandle):
         return {"bfloat16": torch.bfloat16, "float16": torch.float16,
                 "float32": torch.float32}.get(want, torch.float16)
 
+    def _quant_config(self):
+        """BitsAndBytesConfig when the model spec asks for `quant = "4bit"`, else None."""
+        if str(self.spec.get("quant", "")).lower() not in ("4bit", "nf4", "int4"):
+            return None
+        import torch
+        from transformers import BitsAndBytesConfig
+
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,   # T4 has no bf16
+            bnb_4bit_use_double_quant=True,
+        )
+
     def _bundle(self):
         key = (self.name, self._revision())
         cached = TransformersModelHandle._CACHE.get(key)
@@ -111,12 +128,24 @@ class TransformersModelHandle(ModelHandle):
 
         import transformers as tf
 
-        load_kw = dict(revision=self._revision(), torch_dtype=self._resolve_dtype(), device_map="auto")
+        # transformers renamed `torch_dtype` -> `dtype` in 4.56
+        _ver = tuple(int(x) for x in tf.__version__.split(".")[:2])
+        _dtype_kw = "dtype" if _ver >= (4, 56) else "torch_dtype"
+
+        device = self.spec.get("device")                       # e.g. "cuda:1" -- pin to one GPU
+        load_kw = {"revision": self._revision(),
+                   "device_map": ({"": device} if device else "auto")}
+        qconf = self._quant_config()
+        if qconf is not None:
+            load_kw["quantization_config"] = qconf             # bnb owns the compute dtype
+        else:
+            load_kw[_dtype_kw] = self._resolve_dtype()
+
         try:
             tokenizer = tf.AutoTokenizer.from_pretrained(self.name, revision=self._revision())
             model = tf.AutoModelForCausalLM.from_pretrained(self.name, **load_kw)
             bundle = (model.eval(), tokenizer, "causal")
-        except Exception:  # noqa: BLE001 -- arch isn't a plain CausalLM (Gemma 3 4B, other VLMs)
+        except Exception:  # noqa: BLE001 -- not a plain CausalLM (Gemma 3 4B, Qwen3.5-9B, other VLMs)
             processor = tf.AutoProcessor.from_pretrained(self.name, revision=self._revision())
             model = tf.AutoModelForImageTextToText.from_pretrained(self.name, **load_kw)
             bundle = (model.eval(), processor, "vlm")
@@ -147,10 +176,20 @@ class TransformersModelHandle(ModelHandle):
             return msgs
 
         kw = dict(add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt")
+        if self.spec.get("thinking") is False:
+            kw["enable_thinking"] = False        # Qwen3 / Qwen3.5 -- answer directly, no <think> block
+
+        def apply(msgs):
+            try:
+                return tok.apply_chat_template(msgs, **kw)
+            except TypeError:                    # this template doesn't accept enable_thinking
+                kw.pop("enable_thinking", None)
+                return tok.apply_chat_template(msgs, **kw)
+
         try:
-            return tok.apply_chat_template(shape(messages), **kw)
-        except Exception:  # noqa: BLE001 -- template has no system slot (e.g. Gemma)
-            return tok.apply_chat_template(shape(self._fold_system(messages)), **kw)
+            return apply(shape(messages))
+        except Exception:  # noqa: BLE001 -- template rejects a standalone system turn (e.g. Gemma)
+            return apply(shape(self._fold_system(messages)))
 
     def _gen_kwargs(self, overrides: dict) -> dict:
         temperature = float(overrides.get("temperature", self.spec.get("temperature", 0.0)))

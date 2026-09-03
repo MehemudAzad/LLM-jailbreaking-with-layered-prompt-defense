@@ -82,8 +82,9 @@ is one notebook that `git clone`s this repo and drives it:
 | --- | --- | --- |
 | `m1_model_backend.ipynb` | target model (`Qwen/Qwen2.5-3B-Instruct`) via `TransformersModelHandle` | ✅ validated |
 | `m2_perplexity_filter.ipynb` | defense Layer 1 — `gpt2-large` scorer, windowed-perplexity method | ✅ ran |
-| `m3_calibrate_layer1.ipynb` | re-calibrate Layer 1 on the frozen 50-row AdvBench set + 50 benign | ready to run |
-| _(m4)_ | judge model + Layer 4, then the first baseline ASR pass (undefended target) | next |
+| `m3_calibrate_layer1.ipynb` | re-calibrate Layer 1 on the frozen 50-row AdvBench set + 50 benign | ✅ ran (thr 424.8) |
+| `m4_baseline_asr.ipynb` | judge (`Qwen3.5-9B` nf4, Layer 4) + baseline ASR — needs **GPU T4 ×2** | ready to run |
+| _(m5)_ | Layer 2 paraphraser, then the defended ASR pass + before/after | next |
 
 Once M1 is validated and the target `revision` is pinned in `config.toml`:
 

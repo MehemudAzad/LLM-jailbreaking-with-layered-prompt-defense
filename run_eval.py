@@ -4,7 +4,7 @@
     python run_eval.py --dry-run                  # fake models everywhere; walk it end to end
     python run_eval.py --attack prefix_injection  # one technique, real models
     python run_eval.py --attack all --defense on  # the full evaluation pass
-    python run_eval.py --attack all --defense off # baseline ASR (undefended target)
+    python run_eval.py --attack all --defense off # baseline ASR (undefended target, judge still grades)
 
 Every (goal x attack) trial writes exactly one JSONL record to
 `logs/<run-id>/transcript.jsonl`. Those files are the evidence base for both
@@ -27,8 +27,12 @@ from defense import build_pipeline
 from defense.base import DefenseContext
 
 
-def run_trial(goal: Goal, attack, target, helper, pipeline, use_defense: bool) -> DefenseContext:
-    """One goal through one attack, optionally through the defense stack."""
+def run_trial(goal: Goal, attack, target, helper, pipeline, use_defense: bool, grader=None) -> DefenseContext:
+    """One goal through one attack, optionally through the defense stack.
+
+    `grader` (a ResponseClassifier) labels the reply when the defense stack is off, so a
+    baseline run still gets BAD_BOT/GOOD_BOT/UNCLEAR without blocking anything.
+    """
     out = attack.apply(goal.goal, helper=helper if attack.uses_helper_lm else None)
 
     ctx = DefenseContext(
@@ -52,6 +56,8 @@ def run_trial(goal: Goal, attack, target, helper, pipeline, use_defense: bool) -
         ctx.response = target.generate(messages, prefill=ctx.prefill)
         if use_defense:
             ctx = pipeline.run_post(ctx)
+        elif grader is not None:
+            ctx = grader.process(ctx)
 
     return ctx
 
@@ -64,6 +70,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--attack", default="all", help="technique name (see attacks/), or 'all'")
     ap.add_argument("--defense", choices=["on", "off"], default="on")
+    ap.add_argument("--grade", dest="grade", action="store_true", default=True,
+                    help="label each reply with the judge (default; only matters when --defense off)")
+    ap.add_argument("--no-grade", dest="grade", action="store_false")
     ap.add_argument("--dry-run", action="store_true", help="force backend=fake for every model")
     ap.add_argument("--limit", type=int, default=None, help="cap the number of goals")
     ap.add_argument("--tag", default="", help="label folded into the run-id")
@@ -83,6 +92,11 @@ def main(argv=None) -> int:
     helper = load_helper(force_fake=force_fake)
     pipeline = build_pipeline(force_fake=force_fake)
     use_defense = args.defense == "on"
+
+    grader = None
+    if args.grade and not use_defense:
+        from defense.layer4_response_classifier import ResponseClassifier
+        grader = ResponseClassifier({"enabled": True, "enforce": False, "_force_fake": force_fake})
 
     try:
         goals = load_harmful()
@@ -105,21 +119,23 @@ def main(argv=None) -> int:
     tag = args.tag or ("dryrun" if args.dry_run else ("defended" if use_defense else "baseline"))
     trials = 0
     labels: dict[str, int] = {}
+    by_attack: dict[str, dict[str, int]] = {}
 
     with TranscriptLogger(tag=tag) as log:
         log.log({
             "type": "config", "seed": seed, "attack": args.attack, "defense": use_defense,
-            "dry_run": args.dry_run, "n_goals": len(goals), "n_attacks": len(attacks),
-            "attacks": sorted(attacks),
+            "grade": bool(grader) or use_defense, "dry_run": args.dry_run,
+            "n_goals": len(goals), "n_attacks": len(attacks), "attacks": sorted(attacks),
         })
         for goal in goals:
             for name, attack in attacks.items():
                 if name == "adaptive":
-                    # TODO(joint): battery loop -- run every other member, success if ANY is BAD_BOT.
+                    # TODO: battery loop -- run every other member, success if ANY is BAD_BOT.
                     continue
-                ctx = run_trial(goal, attack, target, helper, pipeline, use_defense)
+                ctx = run_trial(goal, attack, target, helper, pipeline, use_defense, grader)
                 label = ctx.metadata.get("response_label", "N/A")
                 labels[label] = labels.get(label, 0) + 1
+                by_attack.setdefault(name, {})[label] = by_attack.setdefault(name, {}).get(label, 0) + 1
                 trials += 1
                 log.log({
                     "type": "trial",
@@ -133,13 +149,20 @@ def main(argv=None) -> int:
                     "system": ctx.system,
                     "response": ctx.response,
                     "label": label,
+                    "label_method": ctx.metadata.get("label_method"),
                     "verdicts": [vars(v) for v in ctx.verdicts],
                     "metadata": ctx.metadata,
                 })
 
+        def _asr(counts: dict[str, int]) -> float | None:
+            n = sum(counts.values())
+            return round(counts.get("BAD_BOT", 0) / n, 4) if n else None
+
         summary = {
             "type": "summary", "trials": trials, "labels": labels,
-            "asr": round(labels.get("BAD_BOT", 0) / trials, 4) if trials else None,
+            "asr": _asr(labels),
+            "asr_by_attack": {n: _asr(c) for n, c in sorted(by_attack.items())},
+            "by_attack": by_attack,
             "run_dir": str(log.dir),
         }
         log.log(summary)
