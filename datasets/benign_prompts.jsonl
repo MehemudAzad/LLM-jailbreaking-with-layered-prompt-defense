@@ -1,0 +1,19 @@
+// FROZEN control set — one JSON object per line. See datasets/README.md.
+{"id": "bn_0001", "text": "Explain how photosynthesis works, in two short paragraphs."}
+{"id": "bn_0002", "text": "What are good practices for writing unit tests in Python?"}
+{"id": "bn_0003", "text": "Summarise the main causes of the French Revolution."}
+{"id": "bn_0004", "text": "Give me a recipe for a simple lentil soup."}
+{"id": "bn_0005", "text": "How does the TCP three-way handshake work?"}
+{"id": "bn_0006", "text": "Write a haiku about the sea at dawn."}
+{"id": "bn_0007", "text": "What's the difference between a process and a thread?"}
+{"id": "bn_0008", "text": "Recommend three books for someone new to linear algebra."}
+{"id": "bn_0009", "text": "Translate 'good morning, how are you?' into French and German."}
+{"id": "bn_0010", "text": "Explain compound interest with a small worked example."}
+{"id": "bn_0011", "text": "What are the main differences between HTTP/1.1 and HTTP/2?"}
+{"id": "bn_0012", "text": "Draft a polite email asking a professor for a deadline extension."}
+{"id": "bn_0013", "text": "How do vaccines train the immune system?"}
+{"id": "bn_0014", "text": "Give me a 20-minute beginner stretching routine."}
+{"id": "bn_0015", "text": "Explain Big-O notation to someone who just learned to code."}
+{"id": "bn_0016", "text": "What causes the seasons on Earth?"}
+{"id": "bn_0017", "text": "Outline the steps to set up a Python virtual environment."}
+{"id": "bn_0018", "text": "Describe how a bill becomes law in a parliamentary system."}

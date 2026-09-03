@@ -2,10 +2,11 @@
 
 CSE-406 Project 2026. One repo, two halves, built in parallel.
 
-Reference material (in the parent folder): `../jailbreak-paper.pdf` (Wei et al. 2023),
-`../baseline-defenses-for-adversarial-attacks.pdf` (Jain et al. 2023),
-`../detecting-language-model-attacks.pdf` (Alon & Kamfonas 2023),
-`../tool27-jailbreak-battery-workflow-2.html` (the working plan).
+Reference material is in [`docs/`](docs/): `jailbreak-paper.pdf` (Wei et al. 2023),
+`baseline-defenses-for-adversarial-attacks.pdf` (Jain et al. 2023),
+`detecting-language-model-attacks.pdf` (Alon & Kamfonas 2023),
+`tool27-jailbreak-battery-workflow-2.html` (the working plan),
+`sprint1-getting-started.md` (this sprint's plan).
 
 ## Who owns what — the rule that keeps us out of each other's way
 
@@ -57,6 +58,7 @@ datasets/
   benign_prompts.jsonl          FROZEN benign set for calibration + quality-drop
 logs/                           raw transcripts, one dir per run
 tests/test_wiring.py            smoke test: everything registers + a dry run returns 0
+docs/                           the three papers, the workflow page, the sprint plans
 ```
 
 ## Quick start

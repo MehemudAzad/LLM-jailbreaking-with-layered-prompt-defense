@@ -19,13 +19,15 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 # ---------------------------------------------------------------------------
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
-name           = "Qwen/Qwen2.5-7B-Instruct"
+name           = "google/gemma-3-4b-it"   # small + genuinely safety-tuned; gated on HF (accept the licence)
 revision       = "PIN-ME"         # <- exact HF commit hash before the first real run
 backend        = "fake"           # fake | transformers | ollama
 dtype          = "bfloat16"
 max_new_tokens = 512
 temperature    = 0.0              # greedy -> deterministic transcripts
 top_p          = 1.0
+# Gemma 3 4B is a vision+text model -- we use the text path only, never pass an image.
+# Optional week-12 cross-check target: mistralai/Mistral-7B-Instruct-v0.3
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
 name           = "Qwen/Qwen2.5-7B-Instruct"
