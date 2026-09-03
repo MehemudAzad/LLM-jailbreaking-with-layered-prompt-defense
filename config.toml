@@ -24,7 +24,7 @@ revision       = "PIN-ME"         # <- exact HF commit hash; m1_model_backend.ip
 backend        = "transformers"   # fake | transformers | ollama
 device         = "cuda:0"         # pin to GPU 0 (Kaggle "T4 x2"); the judge sits on cuda:1
 dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
-max_new_tokens = 512
+max_new_tokens = 256              # enough to judge compliance; ~2x faster than 512 over 800 trials
 temperature    = 0.0              # greedy -> deterministic transcripts
 top_p          = 1.0
 # Optional week-12 cross-check targets: google/gemma-3-4b-it, mistralai/Mistral-7B-Instruct-v0.3

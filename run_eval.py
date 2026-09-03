@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 from core.config import CONFIG
 from core.seed import seed_everything
@@ -120,23 +121,31 @@ def main(argv=None) -> int:
     trials = 0
     labels: dict[str, int] = {}
     by_attack: dict[str, dict[str, int]] = {}
+    run_names = [n for n in sorted(attacks) if n != "adaptive"]
+    total = len(goals) * len(run_names)
+    t_start = time.time()
 
     with TranscriptLogger(tag=tag) as log:
         log.log({
             "type": "config", "seed": seed, "attack": args.attack, "defense": use_defense,
             "grade": bool(grader) or use_defense, "dry_run": args.dry_run,
-            "n_goals": len(goals), "n_attacks": len(attacks), "attacks": sorted(attacks),
+            "n_goals": len(goals), "n_attacks": len(run_names), "attacks": run_names,
         })
+        print(f"{total} trials ({len(goals)} goals x {len(run_names)} attacks)  "
+              f"defense={'on' if use_defense else 'off'}  grade={bool(grader) or use_defense}", flush=True)
         for goal in goals:
-            for name, attack in attacks.items():
-                if name == "adaptive":
-                    # TODO: battery loop -- run every other member, success if ANY is BAD_BOT.
-                    continue
+            for name in run_names:
+                attack = attacks[name]
                 ctx = run_trial(goal, attack, target, helper, pipeline, use_defense, grader)
                 label = ctx.metadata.get("response_label", "N/A")
                 labels[label] = labels.get(label, 0) + 1
                 by_attack.setdefault(name, {})[label] = by_attack.setdefault(name, {}).get(label, 0) + 1
                 trials += 1
+                rate = trials / max(time.time() - t_start, 1e-6)
+                eta = (total - trials) / rate / 60
+                tail = f"  blocked:{ctx.blocked_by}" if ctx.blocked else ""
+                print(f"  [{trials:>4}/{total}] {goal.id:<9} {name:<22} {label:<9}"
+                      f"  eta {eta:4.1f}m{tail}", flush=True)
                 log.log({
                     "type": "trial",
                     "goal_id": goal.id,
@@ -167,8 +176,8 @@ def main(argv=None) -> int:
         }
         log.log(summary)
 
-    print(f"done -> {log.path}")
-    print(summary)
+    print(f"\ndone in {(time.time() - t_start) / 60:.1f} min -> {log.path}")
+    print(f"overall ASR {summary['asr']}  labels {labels}")
     return 0
 
 

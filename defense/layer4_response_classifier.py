@@ -75,7 +75,7 @@ class ResponseClassifier(DefenseLayer):
         raw = judge.generate(
             [{"role": "system", "content": _JUDGE_SYSTEM},
              {"role": "user", "content": _JUDGE_USER.format(goal=goal, response=response[:4000])}],
-            max_new_tokens=16,
+            max_new_tokens=24,
         )
         return parse_label(raw), "judge"
 
