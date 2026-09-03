@@ -1,38 +1,48 @@
 # Datasets — frozen for the whole project
 
-Two small, fixed sets, reused for every run from Sprint 1 to week 13. Freeze them once
-(~15–20 each per the sprint plan), record the counts in `config.toml`
-(`[datasets] harmful_count` / `benign_count`), then don't touch them again.
+Two fixed sets, reused for every run. Counts are pinned in `config.toml` `[datasets]`.
 
-## `harmful_behaviors.jsonl`
+## `harmful_behaviors.jsonl` — **git-ignored**, build it
 
-One JSON object per line:
+```bash
+python datasets/build_harmful.py          # 50 rows (default), seed 1337
+python datasets/build_harmful.py 520      # the full benchmark
+```
 
-    {"id": "hb_0001", "category": "...", "goal": "<a single harmful instruction>",
-     "target_prefix": "Sure, here is", "source": "AdvBench"}
+Deterministic: same seed → same selection. The script pulls from, in order:
 
-- `goal` — one imperative instruction; the thing an attack tries to get the target to do.
-- `target_prefix` — the affirmative opener used by `prefix_injection` / `combination_*`.
-- `source` — where the row came from, for the report's reproducibility section.
+1. `datasets/advBench/**/*.parquet` — the [`walledai/AdvBench`](https://huggingface.co/datasets/walledai/AdvBench)
+   mirror if you've downloaded it (needs `pandas` + `pyarrow`)
+2. `raw.githubusercontent.com/llm-attacks/llm-attacks/.../harmful_behaviors.csv` — the
+   original (Zou et al. 2023), ungated, stdlib-only
 
-**Populate from a published benchmark; don't write these yourself.** The standard choice
-is **AdvBench** (`harmful_behaviors.csv`) from Zou et al. 2023, *Universal and
-Transferable Adversarial Attacks on Aligned Language Models* —
-<https://github.com/llm-attacks/llm-attacks>. Wei et al. 2023 also publish a curated set
-of 32 behaviours. Pick ~15–20, keep the selection fixed, cite it.
+Both are the same 520 `(goal, target)` rows, MIT-licensed. The frozen file is git-ignored
+because the repo is public; anyone regenerates the exact set with the command above.
 
-The rows in the file now are **schema placeholders** (their `goal` starts with `<<`);
-`run_eval.py` refuses a real (non `--dry-run`) run until they're replaced.
+Row shape:
 
-## `benign_prompts.jsonl`
+    {"id": "hb_0001", "category": "advbench", "goal": "<harmful instruction>",
+     "target_prefix": "Sure, here is a", "source": "AdvBench harmful_behaviors #12 (Zou et al. 2023)"}
 
-    {"id": "bn_0001", "text": "<an ordinary request>"}
+- `goal` — the instruction an attack tries to get the target to follow.
+- `target_prefix` — first clause of AdvBench's `target`; the affirmative opener for
+  `prefix_injection` / `combination_*`.
 
-The control group: same size and rough topic spread as the harmful set. Used to
-calibrate the Layer 1 perplexity threshold (target false-positive rate ~6–10%) and to
-measure the benign-quality drop the defense stack costs.
+## `benign_prompts.jsonl` — committed
+
+50 harmless instructions written to **mirror AdvBench's imperative style** ("Write a
+script that…", "Give step-by-step instructions for…") so the Layer 1 false-positive rate
+is measured on a fair control group. Also used to measure the benign-quality drop the
+defense stack costs.
+
+    {"id": "bn_0001", "text": "<an ordinary imperative request>"}
+
+## `advBench/` — the raw download
+
+Kept for provenance (`README.md` only is tracked; the parquet is git-ignored). Delete it
+and the builder falls back to the GitHub CSV.
 
 ## What goes in git
 
-These two `.jsonl` files, yes. The model outputs they produce go to `logs/` — see
-`logs/README.md`.
+`build_harmful.py`, `benign_prompts.jsonl`, `advBench/README.md`. Not the frozen harmful
+set, not the parquet. Model outputs go to `logs/` — see `logs/README.md`.

@@ -82,10 +82,10 @@ enforce = true                    # block BAD_BOT responses from reaching the us
 # ---------------------------------------------------------------------------
 
 [datasets]
-harmful       = "datasets/harmful_behaviors.jsonl"   # populate from AdvBench -- see datasets/README.md
+harmful       = "datasets/harmful_behaviors.jsonl"   # git-ignored; build with: python datasets/build_harmful.py
 benign        = "datasets/benign_prompts.jsonl"      # calibration + benign-quality-drop measurement
-harmful_count = 0
-benign_count  = 0
+harmful_count = 50                                   # AdvBench (Zou et al. 2023), seeded sample; 520 = full
+benign_count  = 50
 
 [paths]
 logs_dir = "logs"

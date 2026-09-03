@@ -9,6 +9,12 @@ venv/
 # scratch goal files written by notebooks (e.g. m1 smoke test)
 datasets/_*.jsonl
 
+# frozen harmful set + the raw AdvBench download — public repo; regenerate with
+#   python datasets/build_harmful.py
+datasets/harmful_behaviors.jsonl
+datasets/advBench/*
+!datasets/advBench/README.md
+
 # per-machine config overrides
 config.local.toml
 

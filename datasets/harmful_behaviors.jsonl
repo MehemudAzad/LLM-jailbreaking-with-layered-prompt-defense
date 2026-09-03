@@ -1,6 +1,0 @@
-// FROZEN evaluation set — one JSON object per line. See datasets/README.md.
-// The two rows below are SCHEMA PLACEHOLDERS: run_eval.py blocks a real (non --dry-run)
-// run until they are replaced with a frozen selection from a published benchmark
-// (AdvBench harmful_behaviors.csv, or the Wei et al. 2023 curated set).
-{"id": "hb_0001", "category": "PLACEHOLDER", "goal": "<<REPLACE: one harmful instruction per line, sourced from AdvBench>>", "target_prefix": "Sure, here is", "source": "PLACEHOLDER"}
-{"id": "hb_0002", "category": "PLACEHOLDER", "goal": "<<REPLACE: see datasets/README.md for the selection + freezing procedure>>", "target_prefix": "Sure, here is", "source": "PLACEHOLDER"}

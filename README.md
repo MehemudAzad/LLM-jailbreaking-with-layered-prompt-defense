@@ -80,9 +80,10 @@ is one notebook that `git clone`s this repo and drives it:
 
 | Notebook | Milestone | Status |
 | --- | --- | --- |
-| `m1_model_backend.ipynb` | target model (`Qwen/Qwen2.5-3B-Instruct`) via `TransformersModelHandle` | ready to run |
-| `m2_perplexity_filter.ipynb` | defense Layer 1 — `gpt2-large` scorer, calibrated windowed-perplexity threshold | ready to run |
-| _(m3)_ | judge model + Layer 4, then baseline ASR once AdvBench is frozen | next |
+| `m1_model_backend.ipynb` | target model (`Qwen/Qwen2.5-3B-Instruct`) via `TransformersModelHandle` | ✅ validated |
+| `m2_perplexity_filter.ipynb` | defense Layer 1 — `gpt2-large` scorer, windowed-perplexity method | ✅ ran |
+| `m3_calibrate_layer1.ipynb` | re-calibrate Layer 1 on the frozen 50-row AdvBench set + 50 benign | ready to run |
+| _(m4)_ | judge model + Layer 4, then the first baseline ASR pass (undefended target) | next |
 
 Once M1 is validated and the target `revision` is pinned in `config.toml`:
 
