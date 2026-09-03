@@ -1,20 +1,21 @@
 """Layer 1 -- perplexity filter (plain + windowed).
 
-Jain et al. 2023 (S3.1); Alon & Kamfonas 2023. Reject a prompt whose log-perplexity
-under a frozen scorer LM exceeds a threshold calibrated on our own benign set. The
-windowed variant also scores contiguous token windows, so a locally-gibberish
-adversarial suffix can't hide inside an otherwise fluent prompt.
+Jain et al. 2023 (S3.1); Alon & Kamfonas 2023. Score each incoming prompt's perplexity
+under a frozen scorer LM (`models.perplexity_scorer`, default gpt2-large). Reject it if
+the score exceeds a threshold calibrated so that no clean reference prompt is flagged
+(Jain et al.'s method -- see notebooks/m2_perplexity_filter.ipynb).
+
+- plain    : perplexity of the whole prompt.
+- windowed : the worst (highest-perplexity) contiguous `window_size`-token span, so a
+             short adversarial suffix can't be diluted by a long fluent prefix. This is
+             what the BLOCK decision uses when `windowed = true`.
 
 Blind spot: a gibberish detector, not a jailbreak detector. Fluent human-authored
-attacks (AIM, roleplay, prefix injection) sail through -- their token statistics look
-perfectly normal.
+attacks (AIM, roleplay, prefix injection) score like normal English and pass straight
+through -- that's expected, and why Layers 2-4 exist.
 
-STATUS: scores + logs, does NOT block yet (`enforce = false` in config.toml).
-TODO(Member B):
-  * real scoring via core.models.load_perplexity_scorer().perplexity()
-  * calibrate `threshold` on datasets/benign_prompts.jsonl (target FPR ~6-10%)
-  * implement the windowed minimum when config `windowed = true`
-  * flip `enforce = true` once calibrated
+Config (`[defense.layer1_perplexity]`): `threshold` (0 = never block, pre-calibration),
+`window_size`, `windowed`, `enforce`.
 """
 from __future__ import annotations
 
@@ -28,20 +29,22 @@ class PerplexityFilter(DefenseLayer):
     source = "Jain et al. 2023; Alon & Kamfonas 2023"
 
     def process(self, ctx: DefenseContext) -> DefenseContext:
-        threshold = float(self.config.get("threshold", 1000.0))
+        threshold = float(self.config.get("threshold", 0.0))
+        window = int(self.config.get("window_size", 16))
+        windowed = bool(self.config.get("windowed", True))
         enforce = bool(self.config.get("enforce", False))
+
         scorer = load_perplexity_scorer(force_fake=self.force_fake)
+        ppl = scorer.perplexity(ctx.prompt)
+        win_ppl = scorer.perplexity(ctx.prompt, window=window) if windowed else ppl
+        decisive = win_ppl if windowed else ppl
 
-        try:
-            score = scorer.perplexity(ctx.prompt)
-        except NotImplementedError:
-            ctx.record(Verdict(self.name, Action.ALLOW, reason="stub: scorer backend not implemented"))
-            return ctx
-
-        over = score > threshold
+        over = threshold > 0.0 and decisive > threshold
         action = Action.BLOCK if (over and enforce) else Action.ALLOW
         ctx.record(Verdict(
-            self.name, action, score=score,
-            reason=f"log-ppl={score:.1f} threshold={threshold:.1f} over={over} enforce={enforce}",
+            self.name, action, score=decisive,
+            reason=(f"ppl={ppl:.0f} windowed_ppl={win_ppl:.0f} "
+                    f"threshold={threshold:.0f} over={over} enforce={enforce}"),
+            detail={"perplexity": ppl, "windowed_perplexity": win_ppl, "window_size": window},
         ))
         return ctx

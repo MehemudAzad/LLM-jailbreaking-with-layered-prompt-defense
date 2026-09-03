@@ -80,8 +80,9 @@ is one notebook that `git clone`s this repo and drives it:
 
 | Notebook | Milestone | Status |
 | --- | --- | --- |
-| `m1_model_backend.ipynb` | target model (`google/gemma-3-4b-it`) via `TransformersModelHandle` | ready to run |
-| _(m2)_ | perplexity scorer + defense Layer 1 + frozen AdvBench harmful set | next |
+| `m1_model_backend.ipynb` | target model (`Qwen/Qwen2.5-3B-Instruct`) via `TransformersModelHandle` | ready to run |
+| `m2_perplexity_filter.ipynb` | defense Layer 1 — `gpt2-large` scorer, calibrated windowed-perplexity threshold | ready to run |
+| _(m3)_ | judge model + Layer 4, then baseline ASR once AdvBench is frozen | next |
 
 Once M1 is validated and the target `revision` is pinned in `config.toml`:
 

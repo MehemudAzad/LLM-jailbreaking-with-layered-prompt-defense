@@ -19,15 +19,14 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 # ---------------------------------------------------------------------------
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
-name           = "google/gemma-3-4b-it"   # small + genuinely safety-tuned; gated on HF (accept the licence)
+name           = "Qwen/Qwen2.5-3B-Instruct"   # text-only, ungated, safety-tuned, has a real system slot
 revision       = "PIN-ME"         # <- exact HF commit hash; m1_model_backend.ipynb prints the current one
 backend        = "transformers"   # fake | transformers | ollama
 dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
 max_new_tokens = 512
 temperature    = 0.0              # greedy -> deterministic transcripts
 top_p          = 1.0
-# Gemma 3 4B is a vision+text model -- we use the text path only, never pass an image.
-# Optional week-12 cross-check target: mistralai/Mistral-7B-Instruct-v0.3
+# Optional week-12 cross-check targets: google/gemma-3-4b-it, mistralai/Mistral-7B-Instruct-v0.3
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
 name           = "Qwen/Qwen2.5-7B-Instruct"
@@ -45,9 +44,9 @@ temperature    = 0.0
 instruction    = "paraphrase the following sentences:"   # fixed wording, from Jain et al.
 
 [models.perplexity_scorer]        # defense Layer 1 -- a small, frozen causal LM
-name           = "gpt2-large"
-revision       = "PIN-ME"
-backend        = "fake"
+name           = "openai-community/gpt2-large"   # GPT-2 (2019), open weights, MIT licence
+revision       = "PIN-ME"         # m2_perplexity_filter.ipynb prints the current hash
+backend        = "transformers"   # fake | transformers
 
 [models.judge]                    # defense Layer 4 + automated grader (BAD_BOT / GOOD_BOT / UNCLEAR)
 name           = "Qwen/Qwen2.5-7B-Instruct"
@@ -61,10 +60,11 @@ temperature    = 0.0
 
 [defense.layer1_perplexity]
 enabled     = true
-enforce     = false               # STUB: score + log only. Flip to true after calibration.
-threshold   = 1000.0              # PLACEHOLDER log-perplexity -- recalibrate on the benign set
-windowed    = true
-window_size = 10                  # tokens
+enforce     = false               # flip true after running notebooks/m2_perplexity_filter.ipynb
+threshold   = 0.0                 # 0 = score + log, never block. Set to the calibrated
+                                  # windowed perplexity (max over the clean reference set) from m2.
+windowed    = true                # BLOCK on the worst-window perplexity, not the whole prompt
+window_size = 16                  # tokens per window
 
 [defense.layer2_paraphrase]
 enabled = true

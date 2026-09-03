@@ -35,8 +35,13 @@ class ModelHandle:
         """Return the model's completion text only (no echo of the prompt)."""
         raise NotImplementedError
 
-    def perplexity(self, text: str) -> float:
-        """Log-perplexity of `text` under this model. Used by defense Layer 1."""
+    def perplexity(self, text: str, *, window: int | None = None) -> float:
+        """Perplexity of `text` under this model (exp of mean token NLL).
+
+        `window=N` returns the worst (highest-perplexity) contiguous N-token window
+        instead of the whole-sequence value -- so a short gibberish span can't hide
+        inside a long fluent prompt. Used by defense Layer 1.
+        """
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -56,22 +61,29 @@ class FakeModelHandle(ModelHandle):
         # target / helper: a refusal by default, so the fake pipeline behaves like a safe model
         return f"[fake:{self.name}#{h}] I can't help with that."
 
-    def perplexity(self, text: str) -> float:
+    def perplexity(self, text: str, *, window: int | None = None) -> float:
         n = max(len(text.split()), 1)
-        return 50.0 + (int(hashlib.sha256(text.encode()).hexdigest(), 16) % 4000) / n
+        base = 50.0 + (int(hashlib.sha256(text.encode()).hexdigest(), 16) % 4000) / n
+        return base * 1.6 if window else base
 
 
 class TransformersModelHandle(ModelHandle):
     """Hugging Face Transformers backend (milestone M1).
 
-    Loads the model once per (name, revision), cached on the class. Handles both plain
-    text models (AutoModelForCausalLM + AutoTokenizer) and text+vision models used
-    text-only (AutoModelForImageTextToText + AutoProcessor -- e.g. google/gemma-3-4b-it).
+    Loads the model once per (name, revision), cached on the class.
+      - Plain text models: AutoModelForCausalLM + AutoTokenizer (e.g. Qwen2.5-3B-Instruct).
+      - Text+vision models used text-only: falls back to AutoModelForImageTextToText +
+        AutoProcessor (e.g. Gemma 3 4B) -- we never pass an image.
+
+    Chat templates are applied as-is; if a template rejects a standalone `system` turn
+    (Gemma does), the system text is folded into the next user turn and retried. Models
+    with a real system slot (Qwen, Mistral, Llama) keep the role separation.
 
     All heavy imports are lazy, so `backend = "fake"` / `--dry-run` never touch torch.
 
-    `perplexity()` is still a stub -- it lands in the defense Layer-1 milestone (it needs
-    a different model, `perplexity_scorer` / gpt2-large, not the target).
+    `generate()` is milestone M1; `perplexity()` (teacher-forced NLL, plain + windowed)
+    is milestone M2 -- used by defense Layer 1, typically with a small scorer model
+    (`perplexity_scorer` / gpt2-large), not the target.
     """
 
     _CACHE: dict = {}
@@ -103,20 +115,17 @@ class TransformersModelHandle(ModelHandle):
         try:
             tokenizer = tf.AutoTokenizer.from_pretrained(self.name, revision=self._revision())
             model = tf.AutoModelForCausalLM.from_pretrained(self.name, **load_kw)
-            bundle = (model.eval(), tokenizer, None, "causal")
+            bundle = (model.eval(), tokenizer, "causal")
         except Exception:  # noqa: BLE001 -- arch isn't a plain CausalLM (Gemma 3 4B, other VLMs)
             processor = tf.AutoProcessor.from_pretrained(self.name, revision=self._revision())
             model = tf.AutoModelForImageTextToText.from_pretrained(self.name, **load_kw)
-            bundle = (model.eval(), None, processor, "vlm")
+            bundle = (model.eval(), processor, "vlm")
 
         TransformersModelHandle._CACHE[key] = bundle
         return bundle
 
     @staticmethod
     def _fold_system(messages: list[Message]) -> list[Message]:
-        """Fold any system turn into the next user turn -- Gemma's chat template (and some
-        others) has no system slot. Models with a real system role lose the separation;
-        acceptable for the target, and the defense writeup should note it."""
         out: list[Message] = []
         sys_buf = ""
         for m in messages:
@@ -130,6 +139,18 @@ class TransformersModelHandle(ModelHandle):
         if sys_buf:
             out.insert(0, {"role": "user", "content": sys_buf.strip()})
         return out
+
+    def _encode(self, tok, messages: list[Message], is_processor: bool):
+        def shape(msgs):
+            if is_processor:
+                return [{"role": m["role"], "content": [{"type": "text", "text": m["content"]}]} for m in msgs]
+            return msgs
+
+        kw = dict(add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt")
+        try:
+            return tok.apply_chat_template(shape(messages), **kw)
+        except Exception:  # noqa: BLE001 -- template has no system slot (e.g. Gemma)
+            return tok.apply_chat_template(shape(self._fold_system(messages)), **kw)
 
     def _gen_kwargs(self, overrides: dict) -> dict:
         temperature = float(overrides.get("temperature", self.spec.get("temperature", 0.0)))
@@ -145,36 +166,44 @@ class TransformersModelHandle(ModelHandle):
     def generate(self, messages, *, prefill=None, **overrides) -> str:
         import torch
 
-        model, tokenizer, processor, kind = self._bundle()
+        model, tok, kind = self._bundle()
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
-        messages = self._fold_system(messages)
 
-        if kind == "causal":
-            enc = tokenizer.apply_chat_template(
-                messages, add_generation_prompt=True, return_tensors="pt", return_dict=True,
-            ).to(model.device)
-            if prefill:
-                tail = tokenizer(prefill, add_special_tokens=False, return_tensors="pt").to(model.device)
-                enc["input_ids"] = torch.cat([enc["input_ids"], tail["input_ids"]], dim=-1)
-                enc["attention_mask"] = torch.cat([enc["attention_mask"], tail["attention_mask"]], dim=-1)
-            decode = tokenizer.decode
-        else:
-            chat = [{"role": m["role"], "content": [{"type": "text", "text": m["content"]}]} for m in messages]
-            enc = processor.apply_chat_template(
-                chat, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt",
-            ).to(model.device)
-            decode = processor.decode
+        enc = self._encode(tok, messages, is_processor=(kind == "vlm")).to(model.device)
+
+        if prefill and kind == "causal":
+            tail = tok(prefill, add_special_tokens=False, return_tensors="pt").to(model.device)
+            enc["input_ids"] = torch.cat([enc["input_ids"], tail["input_ids"]], dim=-1)
+            enc["attention_mask"] = torch.cat([enc["attention_mask"], tail["attention_mask"]], dim=-1)
 
         enc.pop("token_type_ids", None)   # some templates emit it; generate() rejects it
         prompt_len = enc["input_ids"].shape[-1]
         with torch.no_grad():
             out = model.generate(**enc, **self._gen_kwargs(overrides))
-        text = decode(out[0][prompt_len:], skip_special_tokens=True)
+        text = tok.decode(out[0][prompt_len:], skip_special_tokens=True)
         return (prefill + text) if (prefill and kind == "causal") else text
 
-    def perplexity(self, text: str) -> float:
-        raise NotImplementedError("perplexity() lands in the defense Layer-1 milestone")
+    def perplexity(self, text: str, *, window: int | None = None) -> float:
+        import torch
+
+        model, tok, _ = self._bundle()
+        ctx_max = (getattr(model.config, "max_position_embeddings", None)
+                   or getattr(model.config, "n_positions", 1024))
+        ids = tok(text, return_tensors="pt", truncation=True, max_length=ctx_max)["input_ids"].to(model.device)
+        if ids.shape[-1] < 2:
+            return float("inf")
+
+        with torch.no_grad():
+            logits = model(ids).logits[0, :-1].float()          # (T-1, V): position t predicts token t+1
+        nll = -torch.log_softmax(logits, dim=-1).gather(-1, ids[0, 1:, None]).squeeze(-1)   # (T-1,)
+
+        if window is None or window >= nll.numel():
+            return torch.exp(nll.mean()).item()
+
+        csum = torch.cat([nll.new_zeros(1), nll.cumsum(0)])
+        window_means = (csum[window:] - csum[:-window]) / window                            # (T-1-window,)
+        return torch.exp(window_means.max()).item()
 
 
 _BACKENDS: dict[str, type[ModelHandle]] = {

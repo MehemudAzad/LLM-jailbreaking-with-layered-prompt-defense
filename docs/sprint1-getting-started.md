@@ -7,29 +7,26 @@ going deep on any one piece.
 
 ## 1. Pin your target model
 
-Use **Gemma 3 4B IT** (`google/gemma-3-4b-it`) as the primary, pinned target for all
-graded runs — it's small enough to run the full battery repeatedly without long waits,
-and it's a genuinely safety-tuned chat model, so jailbreak attempts against it mean
-something. Gemma 3 4B is a vision+text model, but we only ever use the text path (we
-never pass an image), so it adds no complexity. It's gated on Hugging Face — accept the
-licence on the model page before the first real run.
+Use **`Qwen/Qwen2.5-3B-Instruct`** as the primary, pinned target for all graded runs:
 
-Keep **Mistral-7B-Instruct** (`mistralai/Mistral-7B-Instruct-v0.3`) as a secondary
-target. If time allows in week 12, re-run the final evaluation pass against it too, so
-the report can show the attack/defense stack isn't specific to one model — optional
-polish, not a requirement.
+- text-only (`Qwen2ForCausalLM`) — no multimodal / image handling to deal with
+- ungated on Hugging Face — no licence gate, no token needed to pull the weights
+- genuinely safety-tuned, so jailbreak attempts against it mean something
+- 3B — small enough to run the full battery repeatedly on a Kaggle T4 without long waits
+- has a real `system` prompt slot, which defense Layer 3 (system hardening) relies on
 
-**Correction** (this section previously said "skip Qwen2, it's a vision-language
-model"): that's wrong. `Qwen2` / `Qwen2.5-Instruct` are **text-only** models; the
-vision line is a separate family, **Qwen2-VL / Qwen2.5-VL**. Plain
-`Qwen/Qwen2.5-7B-Instruct` would be a perfectly fine text-only target. We're still
-going with Gemma — but because it's smaller and faster to iterate on, not because of
-anything to do with images.
+Secondary targets for the optional week-12 cross-check (to show the stack isn't specific
+to one model): **`google/gemma-3-4b-it`** or **`mistralai/Mistral-7B-Instruct-v0.3`**.
+Optional polish, not a requirement.
 
-Write down the exact model name and checkpoint/version now — this is the one decision
-everything else depends on, and it needs to be pinned for reproducibility. It lives in
-`config.toml` under `[models.target]`; replace `revision = "PIN-ME"` with a real
-Hugging Face commit hash before any non-`--dry-run` run.
+Naming note: `Qwen2` / `Qwen2.5-Instruct` are text-only models; the vision line is a
+*separate* family, **Qwen2-VL / Qwen2.5-VL**. We use the plain text `Qwen2.5-3B-Instruct`.
+(This section previously said "skip Qwen2, it's a vision-language model" — that was wrong.)
+
+Pin it now — this is the one decision everything else depends on. It lives in
+`config.toml` under `[models.target]`; `notebooks/m1_model_backend.ipynb` prints the
+current Hub commit hash to paste into `revision` (replacing `PIN-ME`) before any
+non-`--dry-run` run.
 
 ## 2. Set up the shared project skeleton
 
