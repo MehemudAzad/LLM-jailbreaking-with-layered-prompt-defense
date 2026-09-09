@@ -30,11 +30,13 @@ top_p          = 1.0
 # Optional week-12 cross-check targets: google/gemma-3-4b-it, mistralai/Mistral-7B-Instruct-v0.3
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
-name           = "Qwen/Qwen2.5-7B-Instruct"
+name           = "Qwen/Qwen2.5-3B-Instruct"   # same weights as the target -> reuses the loaded model, 0 extra VRAM
 revision       = "PIN-ME"
-backend        = "fake"
+backend        = "transformers"   # was "fake": the auto_* attacks were fed placeholder text and their ASR was meaningless
+device         = "cuda:0"
 max_new_tokens = 256
 temperature    = 0.0
+# Simplification vs Wei et al., who use a separate helper LM -- note it in the report.
 
 [models.paraphraser]              # defense Layer 2 -- keep this DIFFERENT from the target
 name           = "HuggingFaceH4/zephyr-7b-beta"
@@ -93,7 +95,12 @@ harmful_count = 50                                   # AdvBench (Zou et al. 2023
 benign_count  = 50
 
 [paths]
-logs_dir = "logs"
+logs_dir   = "logs"
+mirror_dir = ""                   # empty -> auto: /kaggle/working/artifacts when on Kaggle.
+                                  # The repo clone (and its logs/) is deleted every run and the
+                                  # session is wiped, so a finished run is mirrored here to survive
+                                  # as the notebook Output -- that's what you download and commit
+                                  # with `git add -f logs/<run-id>` as report evidence.
 
 [runtime]
 device     = "auto"               # auto | cuda | mps | cpu
