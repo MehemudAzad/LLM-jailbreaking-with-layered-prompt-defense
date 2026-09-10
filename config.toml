@@ -19,21 +19,24 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 # ---------------------------------------------------------------------------
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
-name           = "Qwen/Qwen2.5-3B-Instruct"   # text-only, ungated, safety-tuned, has a real system slot
-revision       = "aa8e72537993ba99e69dfaafa59ed015b17504d1"         # <- exact HF commit hash; m1_model_backend.ipynb prints the current one
+name           = "Qwen/Qwen2.5-7B-Instruct"   # 7B: capable enough to actually run the cipher + persona attacks
+revision       = "PIN-ME"         # m4c_baseline_7b.ipynb prints the current hash
 backend        = "transformers"   # fake | transformers | ollama
-device         = "cuda:0"         # pin to GPU 0 (Kaggle "T4 x2"); the judge sits on cuda:1
+device         = "auto"           # shard across both T4s -- fp16 7B is ~15 GB, too big for one card
+max_memory     = { 0 = "14GiB", 1 = "7GiB" }   # leaves ~8 GB on cuda:1 for the 4-bit judge
 dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
 max_new_tokens = 256              # enough to judge compliance; ~2x faster than 512 over 800 trials
 temperature    = 0.0              # greedy -> deterministic transcripts
 top_p          = 1.0
-# Optional week-12 cross-check targets: google/gemma-3-4b-it, mistralai/Mistral-7B-Instruct-v0.3
+# Previous target (full baseline in logs/20260909-205359-m4baseline-8f2ad3):
+#   Qwen/Qwen2.5-3B-Instruct  rev aa8e72537993ba99e69dfaafa59ed015b17504d1, device cuda:0
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
-name           = "Qwen/Qwen2.5-3B-Instruct"   # same weights as the target -> reuses the loaded model, 0 extra VRAM
-revision       = "aa8e72537993ba99e69dfaafa59ed015b17504d1"
+name           = "Qwen/Qwen2.5-7B-Instruct"   # same name as the target -> reuses the loaded weights, 0 extra VRAM
+revision       = "PIN-ME"
 backend        = "transformers"   # was "fake": the auto_* attacks were fed placeholder text and their ASR was meaningless
-device         = "cuda:0"
+device         = "auto"           # must match the target so the model cache hits
+max_memory     = { 0 = "14GiB", 1 = "7GiB" }
 max_new_tokens = 256
 temperature    = 0.0
 # Simplification vs Wei et al., who use a separate helper LM -- note it in the report.

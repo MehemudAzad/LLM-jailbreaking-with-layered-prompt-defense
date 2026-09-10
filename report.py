@@ -185,19 +185,25 @@ def changed_samples(tag_or_dir: str, n: int = 8, width: int = 220) -> None:
         print()
 
 
-def compare(baseline: str, defended: str, regraded: bool = False) -> pd.DataFrame:
-    """Before/after ASR per attack -- the core result table for the report."""
-    a = asr_table(baseline, regraded)[["category", "ASR_%"]].rename(columns={"ASR_%": "baseline_%"})
-    b = asr_table(defended, regraded)[["ASR_%", "blocked"]].rename(columns={"ASR_%": "defended_%"})
+def compare(run_a: str, run_b: str, label_a: str = "baseline", label_b: str = "defended",
+            regraded: bool = False) -> pd.DataFrame:
+    """Per-attack ASR for two runs side by side.
+
+    Works for baseline-vs-defended and equally for 3B-vs-7B -- just pass labels.
+    """
+    ca, cb = f"{label_a}_%", f"{label_b}_%"
+    a = asr_table(run_a, regraded)[["category", "ASR_%"]].rename(columns={"ASR_%": ca})
+    b = asr_table(run_b, regraded)[["ASR_%", "blocked"]].rename(columns={"ASR_%": cb})
     out = a.join(b, how="outer")
-    out["drop_pp"] = (out["baseline_%"] - out["defended_%"]).round(1)
-    return out.sort_values("baseline_%", ascending=False)
+    out["delta_pp"] = (out[cb] - out[ca]).round(1)
+    return out.sort_values(cb, ascending=False)
 
 
-def print_compare(baseline: str, defended: str, regraded: bool = False) -> pd.DataFrame:
-    tbl = compare(baseline, defended, regraded)
-    print("=== baseline vs defended ASR ===\n")
+def print_compare(run_a: str, run_b: str, label_a: str = "baseline", label_b: str = "defended",
+                  regraded: bool = False) -> pd.DataFrame:
+    tbl = compare(run_a, run_b, label_a, label_b, regraded)
+    ca, cb = f"{label_a}_%", f"{label_b}_%"
+    print(f"=== {label_a} vs {label_b}: ASR per attack ===\n")
     print(tbl.to_string())
-    for col in ("baseline_%", "defended_%"):
-        print(f"\nmean {col}: {tbl[col].mean():.1f}%")
+    print(f"\nmean {label_a}: {tbl[ca].mean():.1f}%     mean {label_b}: {tbl[cb].mean():.1f}%")
     return tbl

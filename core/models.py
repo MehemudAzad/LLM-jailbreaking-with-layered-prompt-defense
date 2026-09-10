@@ -132,9 +132,19 @@ class TransformersModelHandle(ModelHandle):
         _ver = tuple(int(x) for x in tf.__version__.split(".")[:2])
         _dtype_kw = "dtype" if _ver >= (4, 56) else "torch_dtype"
 
-        device = self.spec.get("device")                       # e.g. "cuda:1" -- pin to one GPU
-        load_kw = {"revision": self._revision(),
-                   "device_map": ({"": device} if device else "auto")}
+        # device: "cuda:1" pins the whole model to one GPU; "auto" shards it across all of
+        # them (needed for a 7B in fp16, which does not fit one 16 GB T4). `max_memory`
+        # caps the per-GPU share so a second model still has room -- keys are GPU indices.
+        device = self.spec.get("device")
+        load_kw: dict[str, Any] = {"revision": self._revision()}
+        if device and device != "auto":
+            load_kw["device_map"] = {"": device}
+        else:
+            load_kw["device_map"] = "auto"
+        limits = self.spec.get("max_memory")
+        if limits:
+            load_kw["max_memory"] = {(int(k) if str(k).isdigit() else k): v
+                                     for k, v in dict(limits).items()}
         qconf = self._quant_config()
         if qconf is not None:
             load_kw["quantization_config"] = qconf             # bnb owns the compute dtype
