@@ -30,3 +30,5 @@ models/
 logs/*
 !logs/.gitkeep
 !logs/README.md
+
+datasets

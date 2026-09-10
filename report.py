@@ -127,6 +127,64 @@ def samples(tag_or_dir: str, exclude: str | None = "GOOD_BOT", only: str | None 
         print()
 
 
+def regrade_diff(tag_or_dir: str) -> pd.DataFrame:
+    """Per-attack ASR before vs after a regrade (needs transcript_regraded.jsonl)."""
+    run = find_run(tag_or_dir)
+    path = run / "transcript_regraded.jsonl"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found -- run regrade.py on this run first")
+
+    records = [json.loads(line) for line in open(path, encoding="utf-8")]
+    trials = pd.DataFrame([r for r in records if r.get("type") == "trial"])
+    if trials.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for attack, grp in trials.groupby("attack"):
+        n = len(grp)
+        rows.append({
+            "attack": attack,
+            "n": n,
+            "before_%": round(100 * (grp.label_before_regrade == "BAD_BOT").sum() / n, 1),
+            "after_%": round(100 * (grp.label == "BAD_BOT").sum() / n, 1),
+            "changed": int((grp.label_before_regrade != grp.label).sum()),
+        })
+    out = pd.DataFrame(rows).set_index("attack")
+    out["delta_pp"] = (out["after_%"] - out["before_%"]).round(1)
+    return out.sort_values("before_%", ascending=False)
+
+
+def print_regrade_diff(tag_or_dir: str) -> pd.DataFrame:
+    tbl = regrade_diff(tag_or_dir)
+    _, trials, _ = load_run(tag_or_dir, regraded=True)
+    n = len(trials)
+    before = int((trials.label_before_regrade == "BAD_BOT").sum())
+    after = int((trials.label == "BAD_BOT").sum())
+
+    print("=== regrade: ASR before vs after ===\n")
+    print(tbl.to_string())
+    print(f"\noverall ASR : {100*before/n:.1f}%  ->  {100*after/n:.1f}%   ({before} -> {after} BAD_BOT of {n})")
+    print(f"labels changed: {int((trials.label_before_regrade != trials.label).sum())}/{n}")
+    print(f"label mix after: {trials.label.value_counts().to_dict()}")
+    return tbl
+
+
+def changed_samples(tag_or_dir: str, n: int = 8, width: int = 220) -> None:
+    """Show trials whose label moved during a regrade -- the ones worth eyeballing."""
+    _, trials, _ = load_run(tag_or_dir, regraded=True)
+    moved = trials[trials.label_before_regrade != trials.label]
+    print(f"{len(moved)} labels changed; showing {min(n, len(moved))}\n")
+    for _, row in moved.head(n).iterrows():
+        meta = row.get("metadata") or {}
+        print(f"[{row.attack}]  {row.label_before_regrade} -> {row.label}  ({row.get('label_method')})")
+        print("  goal  :", str(meta.get("goal", ""))[:100])
+        print("  reply :", (row.get("response") or "")[:width].replace("\n", " "))
+        graded = meta.get("graded_text")
+        if graded:
+            print("  judged:", str(graded)[:width].replace("\n", " "), "   <- decoded")
+        print()
+
+
 def compare(baseline: str, defended: str, regraded: bool = False) -> pd.DataFrame:
     """Before/after ASR per attack -- the core result table for the report."""
     a = asr_table(baseline, regraded)[["category", "ASR_%"]].rename(columns={"ASR_%": "baseline_%"})

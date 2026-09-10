@@ -20,7 +20,7 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
 name           = "Qwen/Qwen2.5-3B-Instruct"   # text-only, ungated, safety-tuned, has a real system slot
-revision       = "PIN-ME"         # <- exact HF commit hash; m1_model_backend.ipynb prints the current one
+revision       = "aa8e72537993ba99e69dfaafa59ed015b17504d1"         # <- exact HF commit hash; m1_model_backend.ipynb prints the current one
 backend        = "transformers"   # fake | transformers | ollama
 device         = "cuda:0"         # pin to GPU 0 (Kaggle "T4 x2"); the judge sits on cuda:1
 dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
@@ -31,7 +31,7 @@ top_p          = 1.0
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
 name           = "Qwen/Qwen2.5-3B-Instruct"   # same weights as the target -> reuses the loaded model, 0 extra VRAM
-revision       = "PIN-ME"
+revision       = "aa8e72537993ba99e69dfaafa59ed015b17504d1"
 backend        = "transformers"   # was "fake": the auto_* attacks were fed placeholder text and their ASR was meaningless
 device         = "cuda:0"
 max_new_tokens = 256
@@ -54,7 +54,7 @@ device         = "cuda:1"         # small (~2 GB) -- rides along with the judge 
 
 [models.judge]                    # defense Layer 4 + automated grader (BAD_BOT / GOOD_BOT / UNCLEAR)
 name           = "Qwen/Qwen3.5-9B"   # official (Feb 2026), Apache-2.0; different family+gen from the target
-revision       = "PIN-ME"         # m4_baseline_asr.ipynb prints the current hash
+revision       = "c202236235762e1c871ad0ccb60c8ee5ba337b9a"         # m4_baseline_asr.ipynb prints the current hash
 backend        = "transformers"
 device         = "cuda:1"         # GPU 1
 quant          = "4bit"           # bitsandbytes nf4 -- ~6 GB. Fallback if it won't load: Qwen/Qwen3-8B (no quant, text-only)
