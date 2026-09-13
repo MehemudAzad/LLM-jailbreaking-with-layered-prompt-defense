@@ -1,0 +1,15 @@
+{
+  "id": "khalidhasantuhin/tool-27-m4c-baseline-7b-target",
+  "title": "Tool 27 - M4c baseline (7B target)",
+  "code_file": "../../notebooks/m4c_baseline_7b.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

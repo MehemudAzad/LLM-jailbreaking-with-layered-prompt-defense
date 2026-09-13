@@ -1,0 +1,15 @@
+{
+  "id": "khalidhasantuhin/tool27-m4b-regrade",
+  "title": "tool27-m4b-regrade",
+  "code_file": "../../notebooks/m4b_regrade.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["kmazd1110/baseline-asr-llm-jailbreak"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
