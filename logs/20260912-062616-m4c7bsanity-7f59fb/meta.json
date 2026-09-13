@@ -1,0 +1,13 @@
+{
+  "run_id": "20260912-062616-m4c7bsanity-7f59fb",
+  "ts": 1789194376.9013684,
+  "seed": 1337,
+  "models": {
+    "target": "Qwen/Qwen2.5-7B-Instruct",
+    "helper": "Qwen/Qwen2.5-7B-Instruct",
+    "paraphraser": "HuggingFaceH4/zephyr-7b-beta",
+    "perplexity_scorer": "openai-community/gpt2-large",
+    "judge": "Qwen/Qwen3.5-9B"
+  },
+  "python": "3.12.13"
+}
