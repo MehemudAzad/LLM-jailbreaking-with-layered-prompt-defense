@@ -9,12 +9,14 @@ from core.config import CONFIG
 from defense.base import Action, DefenseContext, DefenseLayer, Stage, Verdict  # noqa: F401 (re-export)
 from defense.pipeline import LayeredDefense
 from defense.layer1_perplexity_filter import PerplexityFilter
+from defense.layer1_5_structural import StructuralCipherCheck
 from defense.layer2_paraphrase import ParaphraseDefense
 from defense.layer3_system_hardening import SystemHardening
 from defense.layer4_response_classifier import ResponseClassifier
 
 _ORDER: list[tuple[str, type[DefenseLayer]]] = [
     ("layer1_perplexity", PerplexityFilter),
+    ("layer1_5_structural", StructuralCipherCheck),
     ("layer2_paraphrase", ParaphraseDefense),
     ("layer3_system_hardening", SystemHardening),
     ("layer4_response_classifier", ResponseClassifier),

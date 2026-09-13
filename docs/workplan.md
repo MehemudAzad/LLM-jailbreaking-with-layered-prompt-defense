@@ -46,10 +46,10 @@ Status legend: ✅ done · 🔧 code done, not run · ⬜ not started
 | layer | what it does | source | status |
 |---|---|---|---|
 | L1 perplexity | reject prompts whose worst token-window perplexity exceeds a calibrated threshold | Jain; Alon & Kamfonas | ✅ threshold 424.8, 0% benign FPR, catches obfuscation only (3/16) |
-| L2 paraphrase | rewrite every prompt through a separate model before it reaches the target | Jain | backend TBD (M5) |
+| L2 paraphrase | rewrite every prompt through a separate model before it reaches the target | Jain | ✅ `Qwen2.5-1.5B-Instruct` nf4; strips instruct preambles, records paraphraser-refusal as its own block |
 | L3 system hardening | instruction-hierarchy reminder + refusal priming in the system prompt | **own design** | prompt written, needs tuning (M5) |
 | L4 response check | judge labels the reply BAD_BOT / GOOD_BOT / UNCLEAR; blocks BAD_BOT | **own design** + Wei rubric | 🔧 code done (M4) |
-| L1.5 structural check | regex for base64 / hex / cipher runs that L1's perplexity misses | **own design (bonus)** | M7 |
+| L1.5 structural check | regex for base64 / hex / cipher runs that L1's perplexity misses | **own design (bonus)** | ✅ built + offline-validated: **0/50 benign FPR, 100% catch on base64 + combination_1/2/3, 0% over-reach** |
 
 ---
 
@@ -151,8 +151,8 @@ Repo, `config.toml`, `core/` (config, seed, models, datasets, transcript), `atta
 | M1 target backend | ✅ |
 | M2 Layer 1 method | ✅ |
 | M3 datasets + recalibration | ✅ |
-| M4 judge + baseline ASR | 🔧 run pending |
-| M5 L2 + L3 + defended ASR | ⬜ |
+| M4 judge + baseline ASR | ✅ **run done** — 7B target, 877 trials / 49 goals, overall ASR **17.3%** (`logs/20260912-070823-m4c7bbaseline-9e6106`) |
+| M5 L2 + L3 + defended ASR | 🔧 code done (L2 backend, `benign_eval.py`, `report.attribution`, `m5_defended_asr.ipynb`) — GPU run pending |
 | M6 adaptive + helper LM | ⬜ |
-| M7 own design / bonus + freeze | ⬜ |
+| M7 own design / bonus + freeze | 🔧 L1.5 built + validated; freeze still pending |
 | M8 reports + demo | ⬜ |

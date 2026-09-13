@@ -102,6 +102,52 @@ def print_asr(tag_or_dir: str, regraded: bool = False, title: str = "") -> pd.Da
     return tbl
 
 
+def attribution(tag_or_dir: str, regraded: bool = False) -> pd.DataFrame:
+    """Which layer stopped each attack -- attack x blocking-layer counts.
+
+    The defended pass's headline number ("ASR fell from X% to Y%") says nothing about
+    *why*. This reads the per-trial `blocked_by` field the pipeline records and credits
+    each block to the layer that actually made it, so the report can say e.g. "the whole
+    base64 family is stopped at L1.5, persona attacks survive to L4". `reached_target`
+    counts trials no PRE layer blocked (L4 judges those after the model answered).
+    """
+    _, trials, _ = load_run(tag_or_dir, regraded)
+    if trials.empty:
+        return pd.DataFrame()
+
+    by = trials.get("blocked_by")
+    if by is None:
+        return pd.DataFrame()
+    who = by.fillna("reached_target").replace({None: "reached_target", "": "reached_target"})
+
+    tbl = pd.crosstab(trials["attack"], who)
+    if "reached_target" not in tbl:
+        tbl["reached_target"] = 0
+    # order columns by pipeline position, then the pass-through bucket last
+    order = [c for c in ("layer1_perplexity", "layer1_5_structural", "layer2_paraphrase",
+                         "layer3_system_hardening", "layer4_response_classifier") if c in tbl]
+    tbl = tbl[order + [c for c in tbl.columns if c not in order and c != "reached_target"]
+              + ["reached_target"]]
+    tbl["n"] = tbl.sum(axis=1)
+    return tbl.sort_values("reached_target")
+
+
+def print_attribution(tag_or_dir: str, regraded: bool = False, title: str = "") -> pd.DataFrame:
+    tbl = attribution(tag_or_dir, regraded)
+    print(f"=== {title or 'per-layer attribution'} ===")
+    if tbl.empty:
+        print("no blocked_by data in this run (was it run with --defense off?)")
+        return tbl
+    print(f"\n{tbl.to_string()}")
+    totals = tbl.drop(columns=["n"]).sum()
+    grand = int(totals.sum())
+    print("\nshare of all trials stopped, by layer:")
+    for layer, cnt in totals.sort_values(ascending=False).items():
+        if cnt:
+            print(f"  {layer:28} {int(cnt):4}  ({100 * cnt / grand:4.1f}%)")
+    return tbl
+
+
 def samples(tag_or_dir: str, exclude: str | None = "GOOD_BOT", only: str | None = None,
             n: int = 8, width: int = 260, regraded: bool = False) -> None:
     """Print goal / reply / label triples for eyeballing the judge."""
