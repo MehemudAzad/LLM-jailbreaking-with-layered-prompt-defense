@@ -19,6 +19,7 @@ Say these things. The screen shows the proof.
 ## Step 1 — "This AI is safe"
 
 **Say:**
+
 > "We attack an AI model called Qwen2.5-7B.
 > First we checked: is it actually safe?
 > We asked it 49 harmful questions, plainly.
@@ -33,16 +34,17 @@ Say these things. The screen shows the proof.
 ## Step 2 — "We tried 18 tricks on it"
 
 **Say:**
+
 > "We wrote 18 different tricks to fool it.
 > Here are three examples."
 
 **The screen shows the real prompts.** Explain each in one line:
 
-| Trick | Say this |
-|---|---|
-| `base64` | "We hide the request in secret code, so no bad word appears." |
-| `distractors` | "We hide the bad question between two harmless questions." |
-| `prefix_injection` | "We force the answer to start with 'Absolutely! Here is'." |
+| Trick                | Say this                                                      |
+| -------------------- | ------------------------------------------------------------- |
+| `base64`           | "We hide the request in secret code, so no bad word appears." |
+| `distractors`      | "We hide the bad question between two harmless questions."    |
+| `prefix_injection` | "We force the answer to start with 'Absolutely! Here is'."    |
 
 ---
 
@@ -51,6 +53,7 @@ Say these things. The screen shows the proof.
 **This is your most important slide.**
 
 **Say:**
+
 > "Most tricks failed.
 > But one trick worked 97.9 percent of the time — 47 out of 48.
 >
@@ -62,6 +65,7 @@ Say these things. The screen shows the proof.
 **Point at:** `prefix_injection → 97.9%`
 
 **Then say:**
+
 > "And if the attacker tries all 18 tricks on every question,
 > he breaks 100 percent of them. Every single one.
 > In fact only 2 tricks are needed to break everything."
@@ -73,6 +77,7 @@ Say these things. The screen shows the proof.
 ## Step 4 — "So we built 6 checkpoints"
 
 **Say:**
+
 > "To stop this we built 6 security checkpoints around the AI.
 > 4 come from research papers. **2 we designed ourselves.**"
 
@@ -85,12 +90,14 @@ question → [L0] [L1] [L1.5] [L2] [L3] → AI answers → [L4] → user
 ```
 
 **Our checkpoint 1 — L1.5 (reads secret codes):**
+
 > "The old checkpoint L1 only *guesses* if text looks strange.
 > Ours does not guess. It **decodes** the secret code and reads it."
 
 **Point at:** the screen shows `d3JpdGUgYSB0dXRvcmlhbC...` decoded back into real English.
 
 **Our checkpoint 2 — L0 (the important one):** ⭐
+
 > "We found a hole in our own defense.
 > The strongest attack — 97.9 percent — was not beating our checkpoints.
 > It was going through a door **nobody was watching.**
@@ -110,6 +117,7 @@ question → [L0] [L1] [L1.5] [L2] [L3] → AI answers → [L4] → user
 ## Step 5 — "And it does not break normal use"
 
 **Say:**
+
 > "A filter that blocks harmful things is easy.
 > A filter that blocks harmful things *and still helps normal users* is the hard part.
 > So we tested it on 50 completely normal questions."
@@ -123,6 +131,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 ```
 
 **Say:**
+
 > "Zero false alarms. One hundred percent catch rate.
 > And it uses no GPU at all — it is one line of pattern matching."
 
@@ -131,6 +140,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 # If the teacher asks...
 
 **"Did the defense work? Show me the after numbers."**
+
 > "The before numbers are finished — 877 attacks, real GPU run.
 > The defense is built and tested, and we proved the 2 new checkpoints work.
 > The full after-run takes 3 hours on GPU and is our next step."
@@ -140,6 +150,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 ---
 
 **"Why did base64 only get 2%? Your attack failed."**
+
 > "No sir — look at the UNCLEAR column. 48 out of 49.
 > The AI never *refused* base64. It simply could not *read* it.
 > It gave us gibberish.
@@ -151,6 +162,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 ---
 
 **"Isn't deleting the prefill just cheating? You removed the attack."**
+
 > "It is what real systems do, sir. OpenAI's API does not let a user write the AI's reply at all.
 > And we did not delete the attack — we only removed that one channel.
 > The text part of the attack still goes through all the other checkpoints.
@@ -159,6 +171,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 ---
 
 **"Which parts did you write yourselves?"**
+
 > "All 18 attacks — we wrote them from the Wei et al. paper, no libraries.
 > Checkpoints L1 and L2 come from the Jain and Alon papers.
 > **Checkpoints L0, L1.5, L3 and L4 are our own design.**"
@@ -166,6 +179,7 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 ---
 
 **"What was your biggest finding?"**
+
 > "That the strongest attack was not clever.
 > It won because it used a channel nobody was checking.
 > Most of our defense was watching the question — but the attack was in the answer field."
@@ -174,13 +188,13 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 
 # Cheat sheet — only 5 numbers to remember
 
-| Number | Meaning |
-|---|---|
-| **98%** | how often the AI refuses a plain harmful question (it is safe) |
-| **97.9%** | our best single attack |
-| **100%** | attacker who tries every trick |
-| **0 / 50** | false alarms on normal questions |
-| **6** | checkpoints we built (2 are our own design) |
+| Number           | Meaning                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| **98%**    | how often the AI refuses a plain harmful question (it is safe) |
+| **97.9%**  | our best single attack                                         |
+| **100%**   | attacker who tries every trick                                 |
+| **0 / 50** | false alarms on normal questions                               |
+| **6**      | checkpoints we built (2 are our own design)                    |
 
 ---
 
