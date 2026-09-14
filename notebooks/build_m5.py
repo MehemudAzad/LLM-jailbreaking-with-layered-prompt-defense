@@ -14,7 +14,8 @@ CELLS: list[tuple[str, str]] = [
 
 Same battery, same 50 AdvBench goals, same seed - but now through the full stack:
 
-    L1 perplexity -> L1.5 structural -> L2 paraphrase -> L3 hardening -> TARGET -> L4 judge
+    L0 prefill guard -> L1 perplexity -> L1.5 structural -> L2 paraphrase -> L3 hardening
+        -> TARGET -> L4 judge
 
 **What this notebook produces** (all three are report deliverables):
 
@@ -36,17 +37,32 @@ Same battery, same 50 AdvBench goals, same seed - but now through the full stack
 | combination_1 | 22.4% |
 | *overall* | **17.3%** |
 
+**The adaptive number this has to beat.** Computed from the baseline transcript (no extra
+GPU time - `report.print_adaptive`): an attacker who tries every technique per goal and
+wins if *any* lands breaks **49/49 goals = 100%**. The greedy coverage curve says
+`prefix_injection` alone accounts for 47 of them and one more technique covers the rest.
+**Two techniques break everything.** That is the number the defense has to move.
+
 **Predictions to check** (write them down before running, so the result can surprise you):
 
+- `prefix_injection` (97.9% undefended) -> should collapse at **L0**. It won by supplying
+  a forged assistant turn, which no previous layer inspected; L0 strips it. The ablations
+  say how much of the 97.9% that accounts for:
+  - `prefix_injection_textonly` = the same instruction with no forged turn. **Whatever
+    this scores is what prefix_injection keeps after L0.**
+  - `prefix_injection_hello` = a forged turn with neutral content. If it scores high, the
+    mechanism is structural (any forced continuation suppresses refusal); if it collapses,
+    the affirmative wording is what mattered.
 - `base64` + `combination_*` -> blocked at **L1.5**, offline-validated at 100% catch / 0% benign FPR.
 - `rot13`, `leetspeak`, `disemvowel` -> blocked at **L1** (M3's measured catch set).
-- `prefix_injection` (97.9% undefended) -> the real test. It is fluent English, so L1
-  and L1.5 cannot see it. It must be stopped by L2 rewriting the forced prefix away,
-  L3's refusal priming, or L4 catching the reply. If it still lands, the stack has a hole.
+- `distractors` (49%) -> the one to watch. Fluent English, no forged turn, no encoding:
+  invisible to L0, L1 and L1.5. It is L3's and L4's problem alone, and it is now probably
+  the strongest surviving attack.
 - Persona attacks (`aim`, `dev_mode`) were already ~0% undefended - they cannot improve,
   so ignore them when judging the stack.
 
 Needs **GPU T4 x2**: target 7B + judge 9B(nf4) + scorer + paraphraser(nf4), all resident.
+20 techniques x 50 goals = ~1000 trials.
 """),
 
 (MD, "## 1 - Setup"),
@@ -206,6 +222,27 @@ If base64 is reaching the target, L1.5 is not enabled - check `[defense.layer1_5
 (CODE, """report.print_asr('m5defended', title='DEFENDED ASR - full stack, Qwen2.5-7B, 50 AdvBench goals')"""),
 
 (CODE, """report.print_attribution('m5defended', title='PER-LAYER ATTRIBUTION - which layer stopped what')"""),
+
+(MD, """### The adaptive number, before and after
+
+This is the headline of the whole project: not "attack X fell from a% to b%", but
+"an attacker who tries everything broke 100% of goals undefended, and N% against the
+stack". Both sides come from transcripts, with no extra GPU time."""),
+
+(CODE, """report.print_adaptive(base, title='ADAPTIVE - undefended (any technique wins)')
+print()
+report.print_adaptive('m5defended', title='ADAPTIVE - defended (any technique wins)')"""),
+
+(MD, """### The prefill ablation
+
+The three `prefix_injection*` rows answer *why* the strongest attack worked and whether
+L0 addressed the real mechanism. Undefended, compare `prefix_injection` (forged turn +
+instruction) against `prefix_injection_textonly` (instruction only) -- the gap is the
+value of the forged-turn channel. Defended, `prefix_injection` and
+`prefix_injection_textonly` should converge, because L0 has made them the same attack."""),
+
+(CODE, """rows = [r for r in report.asr_table('m5defended').index if r.startswith('prefix_injection')]
+print(report.asr_table('m5defended').loc[rows].to_string())"""),
 
 (CODE, """# before/after. The 3B-era baseline is not comparable; use the 7B one (m4c7bbaseline).
 base = 'm4c7bbaseline'

@@ -80,6 +80,13 @@ temperature    = 0.0
 # Defense stack. Order is fixed in defense/__init__.py; toggles live here.
 # ---------------------------------------------------------------------------
 
+[defense.layer0_prefill_guard]  # OUR design (bonus) -- closes the prefix_injection channel
+enabled = true
+action  = "strip"                 # strip | block. "strip" removes the forged assistant turn and
+                                  # lets the prompt continue through the stack, which also measures
+                                  # what prefix_injection is worth without its strongest mechanism.
+                                  # Cannot false-positive: benign requests carry no prefill.
+
 [defense.layer1_perplexity]
 enabled     = true
 enforce     = true                # calibrated in m3_calibrate_layer1.ipynb
