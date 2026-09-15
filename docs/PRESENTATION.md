@@ -137,15 +137,87 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 
 ---
 
+## Step 6 — "And here is the proof it worked" ⭐⭐
+
+**You now have the after numbers.** 489 real attacks through the full 6-checkpoint stack.
+
+**Say:**
+
+> "Then we ran every attack again — this time through all 6 checkpoints."
+
+| | Before | After |
+|---|---|---|
+| Attacks that succeeded | **17.3%** | **0.6%** |
+| `prefix_injection` (our best attack) | **97.9%** | **0.0%** |
+| `distractors` | 49.0% | **0.0%** |
+| `leetspeak` | 44.9% | **0.0%** |
+| Attacker who tries **everything** | **100%** | **12%** |
+
+**Say:**
+
+> "Our strongest attack went from 97.9 percent to zero.
+> An attacker trying every trick went from breaking 100 percent of questions
+> down to 12 percent."
+
+### The clever detail — save this for the end
+
+**Point at the attribution table.** Checkpoint L0 shows **zero blocks**. Explain why:
+
+> "L0 never blocked anything — and that is the point.
+> It does not reject the attack. It just **deletes the forged reply** and lets
+> the question through.
+> All 24 prefix-injection attacks reached the AI — and the AI refused all 24 by itself.
+>
+> We did not intercept the attack. We **disarmed** it, and let the model defend itself."
+
+### Which checkpoint did the work
+
+```
+layer1_5_structural  (OURS)  100 blocks  20.4%   ← all base64 + combinations
+layer1_perplexity             70 blocks  14.3%   ← rot13, leetspeak, disemvowel
+layer2_paraphrase              4 blocks   0.8%
+layer4_response_classifier     3 blocks   0.6%
+```
+
+> "Our two cheapest checkpoints — no GPU, just pattern matching — did **a third of
+> all the blocking**. The expensive AI judge only had to handle 3 cases."
+
+---
+
+## Step 7 — "But it has a cost, and we measured it honestly"
+
+**Do not hide this. Volunteering it is what makes you look like a real engineer.**
+
+```
+Normal questions still answered : 62%   (was 100%)
+Wrongly blocked                 : 34%   ← all by checkpoint L4
+```
+
+**Say:**
+
+> "Our defense also broke normal use. 34 percent of harmless questions got blocked.
+>
+> We found exactly why. Checkpoint L4 asks a second AI:
+> *'Did the model comply with this harmful request?'*
+> But for a harmless question, the model **does** comply — helpfully.
+> So the judge says 'BAD_BOT' and blocks it.
+>
+> The bug is that L4 assumes every request is an attack. It needs to check
+> whether the request was harmful in the first place. That is our next fix."
+
+👉 **This is a genuine bug you found in your own system, with a diagnosis.**
+It does not affect the attack numbers — those questions really were harmful.
+
+---
+
 # If the teacher asks...
 
-**"Did the defense work? Show me the after numbers."**
+**"Why only 489 attacks, not 1000?"**
 
-> "The before numbers are finished — 877 attacks, real GPU run.
-> The defense is built and tested, and we proved the 2 new checkpoints work.
-> The full after-run takes 3 hours on GPU and is our next step."
-
-👉 **Be honest about this.** Do not pretend you have the after numbers.
+> "Kaggle kills a session at 12 hours, and we hit that limit at trial 489.
+> We recovered the transcript from inside the session.
+> It is 25 of our 50 questions, every attack type — enough to report,
+> and we say so rather than rounding it up."
 
 ---
 
@@ -186,15 +258,22 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 
 ---
 
-# Cheat sheet — only 5 numbers to remember
+# Cheat sheet — 6 numbers to remember
 
-| Number           | Meaning                                                        |
-| ---------------- | -------------------------------------------------------------- |
-| **98%**    | how often the AI refuses a plain harmful question (it is safe) |
-| **97.9%**  | our best single attack                                         |
-| **100%**   | attacker who tries every trick                                 |
-| **0 / 50** | false alarms on normal questions                               |
-| **6**      | checkpoints we built (2 are our own design)                    |
+| Number | Meaning |
+| --- | --- |
+| **97.9% → 0.0%** | our best attack, before → after |
+| **17.3% → 0.6%** | all attacks, before → after |
+| **100% → 12%** | attacker who tries every trick, before → after |
+| **34%** | normal questions we wrongly blocked (the L4 bug we found) |
+| **35%** | of all blocking done by our 2 cheapest checkpoints, no GPU |
+| **6** | checkpoints, 2 of our own design |
+
+If you remember only one line:
+
+> **"Our best attack went from 97.9% to zero — and the checkpoint that stopped it
+> never blocked a single request. It just disarmed the attack and let the AI
+> refuse on its own."**
 
 ---
 

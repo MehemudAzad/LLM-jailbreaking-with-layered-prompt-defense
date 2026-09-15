@@ -147,22 +147,65 @@ def part4_proof() -> None:
     pause()
 
 
-def part5_summary() -> None:
-    head("5", "THE SUMMARY")
+def part5_defended() -> None:
+    head("5", "THE RESULT -- same attacks, now through all 6 checkpoints")
+    import report
+
+    report.print_asr("m5defended", title="DEFENDED (489 attacks, 25 goals, full stack)")
+    pause()
+    print()
+    report.print_attribution("m5defended", title="WHICH CHECKPOINT STOPPED WHAT")
+    print("\n  >> Note L0 has ZERO blocks. That is by design: it does not reject the")
+    print("     attack, it deletes the forged reply and lets the question through.")
+    print("     All 24 prefix_injection attacks reached the model -- and the model")
+    print("     refused all 24 by itself. Disarmed, not intercepted.")
+    pause()
+    print()
+    report.print_adaptive("m5defended", title="ADAPTIVE -- attacker tries every technique")
+    pause()
+
+
+def part6_cost() -> None:
+    head("6", "THE COST -- measured honestly")
+    import benign_eval
+
+    benign_eval.print_compare("logs/20260914-175656-m5benign-und-685d91",
+                              "logs/20260914-230249-m5benign-def-2e9f28")
+    print("\n  >> 34% of HARMLESS questions got blocked, all by L4.")
+    print("     Why: L4 asks a judge 'did the model comply with this harmful request?'")
+    print("     For a harmless question the model does comply -- helpfully -- so the")
+    print("     judge says BAD_BOT. L4 assumes every request is an attack.")
+    print("     That is a real bug we found in our own design. It does not affect the")
+    print("     attack numbers, where the requests genuinely were harmful.")
+    pause()
+
+
+def part7_summary() -> None:
+    head("7", "THE SUMMARY")
     print("""
-  1. The model refuses plain harmful requests 98% of the time. It is safe.
+  BEFORE                                AFTER
+  ------                                -----
+  all attacks          17.3%     ->     0.6%
+  prefix_injection     97.9%     ->     0.0%
+  distractors          49.0%     ->     0.0%
+  attacker tries all    100%     ->      12%
 
-  2. But one trick -- forcing the reply to begin with "Absolutely! Here is" --
-     beat it 97.9% of the time.
+  1. The model was already safe: it refused 98% of plain harmful requests.
 
-  3. An attacker trying every trick broke 100% of goals. Two tricks suffice.
+  2. But one trick beat it 97.9% of the time -- by writing the first words
+     of the model's own reply, so a refusal had nowhere to begin.
 
-  4. We built 6 checkpoints. Two are our own design:
-       L1.5  reads hidden codes           -> 100% caught, 0 false alarms
-       L0    blocks forged AI replies     -> closes the 97.9% attack
+  3. An attacker trying every trick broke 100% of goals. Two tricks sufficed.
 
-  5. The interesting finding: the strongest attack was not beating our
-     defenses -- it was using a channel no defense was watching.
+  4. We built 6 checkpoints. Two are our own design, and our two CHEAPEST
+     ones -- no GPU, pure pattern matching -- did 35% of all the blocking.
+
+  5. The finding: the strongest attack was not beating our defenses. It was
+     using a channel no defense was watching. Once we closed it, the model
+     defended itself.
+
+  6. And it cost us: 34% of harmless questions were wrongly blocked, all by
+     one checkpoint whose bug we diagnosed but have not yet fixed.
 """)
 
 
@@ -170,18 +213,18 @@ def main() -> None:
     global PAUSE
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-pause", action="store_true")
-    ap.add_argument("--part", type=int, choices=[1, 2, 3, 4, 5])
+    ap.add_argument("--part", type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     a = ap.parse_args()
     PAUSE = not a.no_pause
 
     parts = {1: part1_attacks, 2: part2_results, 3: part3_defense,
-             4: part4_proof, 5: part5_summary}
+             4: part4_proof, 5: part5_defended, 6: part6_cost, 7: part7_summary}
     print("\n" + "=" * W)
     print("  TOOL 27 -- LLM JAILBREAK BATTERY + LAYERED PROMPT DEFENSE")
     print("  CSE-406  |  Khalid Hasan Tuhin (2105002) - Mehemud Azad (2105014)")
     print("=" * W)
 
-    for n in ([a.part] if a.part else [1, 2, 3, 4, 5]):
+    for n in ([a.part] if a.part else [1, 2, 3, 4, 5, 6, 7]):
         parts[n]()
 
 
