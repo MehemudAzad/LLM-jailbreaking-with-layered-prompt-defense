@@ -59,13 +59,15 @@ form her safety training never saw.
 
 ---
 
-## 3. The 5 checkpoints (your defense)
+## 3. The 6 checkpoints (your defense)
 
 A request has to walk past all of these to reach the librarian, and the answer has to
 walk past one more on the way back out.
 
 ```
   your question
+       ↓
+  [0]  Prefill guard      ── "did the attacker write the AI's reply?"   ← NEW
        ↓
   [1]  Perplexity check   ── "does this look like gibberish?"
        ↓
@@ -153,52 +155,80 @@ per-layer report (*which* checkpoint stopped each attack, not just "attacks went
 
 ---
 
-## 6. What happens next — one command
+## 6. The result — it worked
 
-Everything is written, tested, and pushed to GitHub. The next run measures the "after"
-picture and is the **core result of your whole project**.
+The defended run is **done**. 489 real attacks through all 6 checkpoints:
 
-```bash
-kaggle/run.sh m5_defended_asr
+| | Before | After |
+|---|---|---|
+| All attacks succeeded | **17.3%** | **0.6%** |
+| `prefix_injection` (best attack) | **97.9%** | **0.0%** |
+| `distractors` | 49.0% | **0.0%** |
+| `leetspeak` | 44.9% | **0.0%** |
+| Attacker who tries **everything** | **100%** | **12%** |
+
+### The best part: checkpoint L0 blocked *nothing*
+
+That sounds like failure. It isn't — it's the design working.
+
+L0 doesn't reject the attack. It just **deletes the fake reply** the attacker wrote,
+then lets the question through. So all 24 `prefix_injection` attacks reached the AI —
+**and the AI refused all 24 on its own.**
+
+You didn't block the attack. You **took its weapon away** and let the model defend itself.
+
+### Who did the blocking
+
+```
+L1.5 (ours)   100 blocks  20.4%   ← every base64 + combination attack
+L1             70 blocks  14.3%   ← rot13, leetspeak, disemvowel
+L2              4 blocks   0.8%
+L4 (ours)       3 blocks   0.6%
 ```
 
-That pushes the notebook to Kaggle, runs it on their GPUs, and downloads the results
-when it's done. It takes **2–4 hours**. Watch it any time with:
-
-```bash
-kaggle/watch.sh m5_defended_asr
-```
-
-**I did not start this run myself**, on purpose: it eats several hours of your limited
-free Kaggle GPU quota, and the notebook has three "stop and look" checkpoints designed
-for a human to eyeball (does everything fit in memory? does the paraphraser actually
-paraphrase? are the right attacks being blocked?). That's your call to spend, not mine.
-
-### What that run will tell you
-
-Three tables, all of which go straight into the reports:
-
-1. **Cost of defense** — do the checkpoints ruin ordinary questions? (Should be: barely.)
-2. **Defended attack success** — the same 18 tricks, now vs. all 5 checkpoints.
-3. **Who stopped what** — the interesting one. The prediction to check:
-   > `prefix_injection` won 97.9% of the time with no defenses. It's plain English, so
-   > checkpoints 1 and 1.5 *cannot* see it. If it's still winning after the run,
-   > your stack has a real hole and checkpoint 3's wording needs work.
+Your **two cheapest** checkpoints — no GPU, just pattern matching — did **35% of all
+the blocking**. The expensive AI judge only had to handle 3 cases.
 
 ---
 
-## 7. Where things stand
+## 7. The cost — and a bug we found
+
+Blocking attacks is easy. Not annoying real users is the hard part. We measured it:
+
+```
+Normal questions still answered : 62%   (was 100%)
+Wrongly blocked                 : 34%   ← all by checkpoint L4
+```
+
+**Why L4 gets it wrong:** it asks a judge *"did the model comply with this harmful
+request?"* But for a harmless question, the model **does** comply — helpfully. So the
+judge says "BAD_BOT" and blocks it.
+
+**L4 assumes every request is an attack.** It needs to first check whether the request
+was harmful at all. That's a real bug, found in your own design, not yet fixed.
+
+It does **not** affect the attack numbers — there, the requests genuinely were harmful.
+
+---
+
+## 8. Where things stand
 
 | Milestone | Status |
 |---|---|
 | M0–M3 — setup, target model, perplexity filter, datasets | ✅ done |
-| M4 — the judge + "before" measurement | ✅ **done** (877 attempts, 17.3%) |
-| M5 — all defenses + "after" measurement | 🔧 **code done, GPU run is your next step** |
-| M6 — the adaptive attack (try all 18, count a win if *any* lands) | ⬜ not started |
-| M7 — freeze everything, one final clean run | ⬜ not started |
-| M8 — reports + live demo | ⬜ design report drafted, needs the new numbers |
+| M4 — the judge + "before" measurement | ✅ done (877 attempts, 17.3%) |
+| M5 — all defenses + "after" measurement | ✅ **done** (489 attempts, 0.6%) |
+| M6 — the adaptive attack | ✅ done (100% → 12%) |
+| M7 — freeze + one final clean run | ⬜ optional polish |
+| M8 — reports + live demo | 🔧 demo ready, reports need the new numbers |
 
-**One thing to know:** `docs/design-report.tex` (your graded Design Report) was written
-when the target model was the smaller 3B and no results existed yet. The numbers and
-model name in it are now out of date. Say the word and I'll update it against the real
-7B results.
+### Two things still open
+
+1. **`docs/design-report.tex`** (your graded Design Report) was written when the target
+   was the smaller 3B model and no results existed. The model name and numbers in it are
+   out of date.
+
+2. **The L4 bug** above. Fixing it would raise the "normal questions answered" number
+   from 62% back toward 100%. It would need a re-run to re-measure.
+
+Neither blocks your presentation — `python3 demo.py` shows everything above with real data.
