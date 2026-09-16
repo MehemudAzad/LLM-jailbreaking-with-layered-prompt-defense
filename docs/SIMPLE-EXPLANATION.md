@@ -25,7 +25,7 @@ In the real code:
 - The librarian = **Qwen2.5-7B-Instruct**, an AI model (the "victim")
 - The dangerous questions = **50 requests from AdvBench**, a standard list researchers use
 - The tricks = the 18 files in `attacks/`
-- The checkpoints = the 5 files in `defense/`
+- The checkpoints = the 6 files in `defense/`
 
 ---
 
@@ -84,8 +84,9 @@ walk past one more on the way back out.
   you get the answer (or a refusal)
 ```
 
-**Why five instead of one?** Because each one is blind to something:
+**Why six instead of one?** Because each one is blind to something:
 
+- Checkpoint 0 only spots a *forged reply*. Most attacks don't use one, so they pass.
 - Checkpoint 1 only spots *gibberish*. `prefix_injection` is perfect English, so it
   strolls right past.
 - Checkpoint 1.5 only spots *secret codes*. Role-play tricks aren't coded, so they pass.
