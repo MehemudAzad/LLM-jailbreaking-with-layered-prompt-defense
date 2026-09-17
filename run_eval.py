@@ -77,10 +77,19 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="force backend=fake for every model")
     ap.add_argument("--limit", type=int, default=None, help="cap the number of goals")
     ap.add_argument("--tag", default="", help="label folded into the run-id")
-    args = ap.parse_args(argv)
+    ap.add_argument("--target-path", "--target-model", dest="target_path", default=None,
+                    help="override target model path or HuggingFace ID")
+    args, _ = ap.parse_known_args(argv)
 
     seed = seed_everything()
     force_fake = args.dry_run
+
+    if args.target_path:
+        CONFIG["models"]["target"]["name"] = args.target_path
+        import os
+        if os.path.exists(args.target_path):
+            CONFIG["models"]["target"]["revision"] = None
+            CONFIG["models"]["target"]["local_files_only"] = True
 
     attacks = load_attacks()
     if args.attack != "all":

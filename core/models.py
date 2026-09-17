@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import os
 from typing import Any
 
 from core.config import CONFIG
@@ -136,7 +137,16 @@ class TransformersModelHandle(ModelHandle):
         # them (needed for a 7B in fp16, which does not fit one 16 GB T4). `max_memory`
         # caps the per-GPU share so a second model still has room -- keys are GPU indices.
         device = self.spec.get("device")
-        load_kw: dict[str, Any] = {"revision": self._revision()}
+        is_local = os.path.isdir(str(self.name))
+        load_kw: dict[str, Any] = {}
+        tok_kw: dict[str, Any] = {}
+        if is_local or self.spec.get("local_files_only"):
+            load_kw["local_files_only"] = True
+            tok_kw["local_files_only"] = True
+        elif self._revision():
+            load_kw["revision"] = self._revision()
+            tok_kw["revision"] = self._revision()
+
         if device and device != "auto":
             load_kw["device_map"] = {"": device}
         else:
@@ -152,11 +162,11 @@ class TransformersModelHandle(ModelHandle):
             load_kw[_dtype_kw] = self._resolve_dtype()
 
         try:
-            tokenizer = tf.AutoTokenizer.from_pretrained(self.name, revision=self._revision())
+            tokenizer = tf.AutoTokenizer.from_pretrained(self.name, **tok_kw)
             model = tf.AutoModelForCausalLM.from_pretrained(self.name, **load_kw)
             bundle = (model.eval(), tokenizer, "causal")
         except Exception:  # noqa: BLE001 -- not a plain CausalLM (Gemma 3 4B, Qwen3.5-9B, other VLMs)
-            processor = tf.AutoProcessor.from_pretrained(self.name, revision=self._revision())
+            processor = tf.AutoProcessor.from_pretrained(self.name, **tok_kw)
             model = tf.AutoModelForImageTextToText.from_pretrained(self.name, **load_kw)
             bundle = (model.eval(), processor, "vlm")
 
