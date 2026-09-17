@@ -60,8 +60,10 @@ def run(defended: bool, limit: int | None = None, force_fake: bool = False,
                  "target": CONFIG["models"]["target"]["name"]})
 
         for i, bp in enumerate(prompts, 1):
+            # metadata["goal"] is what Layer 4 shows the judge as the request. Omitting it
+            # sent an empty request and the judge graded a helpful answer against nothing.
             ctx = DefenseContext(goal_id=bp.id, attack="benign", original_prompt=bp.text,
-                                 prompt=bp.text)
+                                 prompt=bp.text, metadata={"goal": bp.text})
             if pipeline is not None:
                 ctx = pipeline.run_pre(ctx)
 
