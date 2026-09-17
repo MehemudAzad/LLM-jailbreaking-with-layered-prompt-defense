@@ -554,7 +554,13 @@ A refusal then has nowhere to begin. L2's paraphrase cannot help --- it rewrites
 
 The principle L0 enforces is one line: \textbf{the assistant turn belongs to the model, not to the client.} This is the instruction-hierarchy idea of L3 applied to the \emph{structure} of the conversation rather than the content of a message, and it is what a real deployment does --- hosted APIs either forbid client-supplied assistant prefill outright or strip it at the gateway.
 
-It cannot produce a false positive: an ordinary request carries no prefill at all, so the guard is a no-op on every benign trial \emph{by construction} rather than by calibration. And it does not reject the request --- it removes the forged turn and lets the prompt continue, so the rest of the stack still judges it on its merits. Section~\ref{sec:results} shows the consequence: all 24 \texttt{prefix\_injection} trials reached the target and the model refused every one of them unaided. The attack was disarmed, not intercepted.
+It cannot produce a false positive: an ordinary request carries no prefill at all, so the guard is a no-op on every benign trial \emph{by construction} rather than by calibration. And it does not reject the request --- it removes the forged turn and lets the prompt continue, so the rest of the stack still judges it on its merits.
+
+\textbf{The ablation refuted the premise, and the claim is revised accordingly.} Two variants were added to separate the technique's two mechanisms. Measured undefended over the same 25 goals: the full attack scores 100.0\%, \texttt{prefix\_injection\_textonly} (instruction, \emph{no} forged turn) scores \textbf{96.0\%}, and \texttt{prefix\_injection\_hello} (neutral forged turn) scores 16.0\%.
+
+So the forged turn is worth about four points, not 97.9. The textual instruction carries the attack. And a \emph{neutral} forced continuation scores far worse than none at all, which shows the effect is semantic --- the affirmative wording --- rather than structural.
+
+L0 is retained on a narrower and honest claim: it closes a real channel at zero cost and cannot false-positive, and the principle stands independently of how hard this particular battery exercised it. But what collapsed \texttt{prefix\_injection} in the defended run was L3's hardening plus the model's own refusal, not L0 --- demonstrated by \texttt{prefix\_injection\_textonly} also falling to 0.0\% defended, where L0 has nothing to act on.
 
 \subsection{Cost of Defense}
 Blocking harmful prompts is only half the design question --- a filter that also refuses ordinary requests is not a working defense. Layer~1's threshold was calibrated for 0\% false-positive rate on the frozen benign set specifically to avoid that trade-off, and L0 and L1.5 cannot false-positive at all by construction. The measured cost of the assembled stack, and a judge-framing bug it exposed, are reported in Section~\ref{sec:results}.
@@ -658,7 +664,9 @@ Two results here matter more than the headline ASR.
 
 \textbf{The two cheapest layers do a third of the work.} L1 and L1.5 together account for 34.7\% of all blocking, and neither runs a language model --- L1.5 is a single regex pass and a decode. The expensive judge handled three cases. A layered design is usually justified on coverage; here it is also justified on cost.
 
-\textbf{L0 recorded zero blocks, and that is the design working.} It does not reject a request; it strips the forged assistant turn and lets the prompt continue. All 24 \texttt{prefix\_injection} trials therefore \emph{reached the target} --- and the model refused all 24 unaided, moving the technique from 97.9\% to 0.0\%. The attack was disarmed rather than intercepted, which is a stronger property: the defense restored the model's own ability to refuse instead of substituting for it.
+\textbf{L0 recorded zero blocks --- and the ablation explains why that is not the triumph it looks like.} L0 strips the forged assistant turn rather than rejecting the request, so all 24 \texttt{prefix\_injection} trials reached the target and the model refused all 24 unaided, moving the technique from 97.9\% to 0.0\%.
+
+We first read that as L0 disarming the attack. The ablation says otherwise: \texttt{prefix\_injection\_textonly}, which carries no forged turn for L0 to strip, scores 96.0\% undefended and \textbf{also} falls to 0.0\% defended. Since L0 cannot act on it, the collapse must come from elsewhere --- L3's hardened system prompt, which names this exact wrapper, plus the victim's own refusal. L0's measured contribution is the roughly four points separating the full attack from \texttt{\_textonly}.
 
 \subsection{Cost of Defense, and a Bug It Exposed}
 50 benign prompts, identical seed, stack off versus on:

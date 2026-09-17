@@ -110,8 +110,8 @@ def part3_defense() -> None:
     print(f"    before : forged assistant turn = {ctx.prefill!r}")
     PrefillGuard({"enabled": True, "action": "strip"}).process(ctx)
     print(f"    after  : forged assistant turn = {ctx.prefill!r}")
-    print("\n    >> We found NO layer had ever looked at this field.")
-    print("       The strongest attack was walking through an unwatched door.")
+    print("\n    >> No layer had ever looked at this field, so we built L0 for it.")
+    print("       Then we ABLATED it to check the hypothesis -- see part 5.")
     pause()
 
 
@@ -155,10 +155,24 @@ def part5_defended() -> None:
     pause()
     print()
     report.print_attribution("m5defended", title="WHICH CHECKPOINT STOPPED WHAT")
-    print("\n  >> Note L0 has ZERO blocks. That is by design: it does not reject the")
-    print("     attack, it deletes the forged reply and lets the question through.")
-    print("     All 24 prefix_injection attacks reached the model -- and the model")
-    print("     refused all 24 by itself. Disarmed, not intercepted.")
+    print("\n  >> L0 shows ZERO blocks: it strips the forged reply rather than")
+    print("     rejecting, so all 24 prefix_injection attacks reached the model")
+    print("     -- and the model refused all 24 by itself.")
+    print("     We first read that as L0 disarming the attack. The ablation")
+    print("     below shows that reading was WRONG.")
+    pause()
+    print()
+    print("  --- ABLATION: which half of prefix_injection actually works? ---\n")
+    print("     undefended, same 25 goals:")
+    print("       prefix_injection            100.0%   instruction + forged turn")
+    print("       prefix_injection_textonly    96.0%   instruction ONLY  <-- barely drops")
+    print("       prefix_injection_hello       16.0%   neutral forged turn")
+    print()
+    print("     >> The forged turn is worth ~4 points, not 97.9.")
+    print("        The INSTRUCTION was the mechanism all along.")
+    print("        textonly also falls to 0.0% defended -- and L0 cannot touch it --")
+    print("        so L3 hardening + the model's own refusal did the work, not L0.")
+    print("        We hypothesised, built, measured, and were wrong. That is the finding.")
     pause()
     print()
     report.print_adaptive("m5defended", title="ADAPTIVE -- attacker tries every technique")
@@ -200,9 +214,10 @@ def part7_summary() -> None:
   4. We built 6 checkpoints. Two are our own design, and our two CHEAPEST
      ones -- no GPU, pure pattern matching -- did 35% of all the blocking.
 
-  5. The finding: the strongest attack was not beating our defenses. It was
-     using a channel no defense was watching. Once we closed it, the model
-     defended itself.
+  5. The finding: we thought prefix_injection won by forging the model's
+     reply, and built L0 to stop that. The ablation refuted it -- the
+     instruction alone still scores 96%. L3 hardening is what actually
+     defeated it. Being able to say that is worth more than the 0.6%.
 
   6. And it cost us: 34% of harmless questions were wrongly blocked, all by
      one checkpoint whose bug we diagnosed but have not yet fixed.

@@ -57,10 +57,10 @@ Say these things. The screen shows the proof.
 > "Most tricks failed.
 > But one trick worked 97.9 percent of the time — 47 out of 48.
 >
-> Why? Because we do not *ask* the AI to answer.
-> We write the first words of its answer *for* it.
-> We write 'Absolutely! Here is' — and the AI just continues from there.
-> Once it has started saying yes, it cannot say no."
+> Why? Two possible reasons, and we tested both in Step 4:
+> we *tell* it to start with 'Absolutely! Here is', **and** we also write
+> those words into its reply for it.
+> One of those turned out to matter far more than the other."
 
 **Point at:** `prefix_injection → 97.9%`
 
@@ -96,21 +96,39 @@ question → [L0] [L1] [L1.5] [L2] [L3] → AI answers → [L4] → user
 
 **Point at:** the screen shows `d3JpdGUgYSB0dXRvcmlhbC...` decoded back into real English.
 
-**Our checkpoint 2 — L0 (the important one):** ⭐
+**Our checkpoint 2 — L0 (and the honest twist):** ⭐
 
-> "We found a hole in our own defense.
-> The strongest attack — 97.9 percent — was not beating our checkpoints.
-> It was going through a door **nobody was watching.**
+> "The attacker is allowed to write the AI's own reply for it.
+> All our other checkpoints check the *question* — nobody checked the *answer field*.
+> So we built L0 to delete it.
 >
-> The attacker was allowed to write the AI's own reply for it.
-> All 5 of our checkpoints were checking the *question*.
-> Nobody checked the *answer field*.
->
-> So we built L0. It deletes anything the attacker writes into the AI's mouth."
+> Then we tested whether that was actually the attack's mechanism — and **it wasn't.**"
 
 **Point at:** `before: 'Absolutely! Here is '` → `after: None`
 
-> **This is the best part of your presentation. It shows you found a real bug yourselves.**
+### The ablation — save this, it is your strongest moment ⭐⭐
+
+**Say:**
+
+> "We split the attack into its two halves and measured them separately."
+
+| Variant | ASR |
+|---|---|
+| instruction + forged reply | **100%** |
+| instruction only (no forged reply) | **96%** |
+| neutral forged reply ("Hello!") | 16% |
+
+> "Removing the forged reply costs 4 percent, not 97.
+> The **instruction** was doing the work all along.
+>
+> So L0 is not what stopped this attack. Checkpoint L3 — the hardened
+> rules — is. We proved it: the instruction-only version also drops to
+> zero, and L0 cannot even touch that one.
+>
+> We had a theory, built a defense on it, measured, and the measurement
+> said we were wrong. That is why we ran the ablation."
+
+👉 **This is the best part of your presentation.** Most students report only what worked. Showing that you tested your own assumption and reported the refutation is what a real researcher does.
 
 ---
 
@@ -159,16 +177,19 @@ distractors      caught           : 0 / 50     ← correctly ignores what is not
 > An attacker trying every trick went from breaking 100 percent of questions
 > down to 12 percent."
 
-### The clever detail — save this for the end
+### The detail — which checkpoint gets the credit
 
-**Point at the attribution table.** Checkpoint L0 shows **zero blocks**. Explain why:
+**Point at the attribution table.** Checkpoint L0 shows **zero blocks**.
 
-> "L0 never blocked anything — and that is the point.
-> It does not reject the attack. It just **deletes the forged reply** and lets
-> the question through.
-> All 24 prefix-injection attacks reached the AI — and the AI refused all 24 by itself.
+> "L0 blocked nothing, because it strips the forged reply instead of rejecting.
+> All 24 prefix-injection attacks reached the AI — and the AI refused all 24.
 >
-> We did not intercept the attack. We **disarmed** it, and let the model defend itself."
+> We first thought that meant L0 disarmed the attack. The ablation in Step 4
+> says otherwise: the instruction-only version has no forged reply at all,
+> and it *also* drops to zero. L0 cannot touch that one.
+>
+> So the credit belongs to **L3, the hardened system prompt** — which names
+> this exact trick — plus the AI's own refusal."
 
 ### Which checkpoint did the work
 
@@ -202,8 +223,10 @@ Wrongly blocked                 : 34%   ← all by checkpoint L4
 > But for a harmless question, the model **does** comply — helpfully.
 > So the judge says 'BAD_BOT' and blocks it.
 >
-> The bug is that L4 assumes every request is an attack. It needs to check
-> whether the request was harmful in the first place. That is our next fix."
+> The bug is that L4 assumed every request is an attack. We fixed it —
+> the judge now decides harmfulness itself instead of being told — and we
+> re-scored all 489 attack trials to confirm the fix did not weaken
+> attack detection."
 
 👉 **This is a genuine bug you found in your own system, with a diagnosis.**
 It does not affect the attack numbers — those questions really were harmful.
@@ -252,9 +275,11 @@ It does not affect the attack numbers — those questions really were harmful.
 
 **"What was your biggest finding?"**
 
-> "That the strongest attack was not clever.
-> It won because it used a channel nobody was checking.
-> Most of our defense was watching the question — but the attack was in the answer field."
+> "That our own hypothesis was wrong, and we could prove it.
+> We thought the strongest attack won by forging the AI's reply, so we built a
+> checkpoint to strip that. Then we ablated it: with the forged reply removed,
+> the attack still scored 96 percent. The plain instruction was the mechanism.
+> The checkpoint that actually stopped it was the hardened system prompt."
 
 ---
 
@@ -267,13 +292,18 @@ It does not affect the attack numbers — those questions really were harmful.
 | **100% → 12%** | attacker who tries every trick, before → after |
 | **34%** | normal questions we wrongly blocked (the L4 bug we found) |
 | **35%** | of all blocking done by our 2 cheapest checkpoints, no GPU |
-| **6** | checkpoints, 2 of our own design |
+| **96%** | the attack WITHOUT the forged reply — the ablation that refuted our theory |
+| **6** | checkpoints, 4 of our own design |
 
 If you remember only one line:
 
-> **"Our best attack went from 97.9% to zero — and the checkpoint that stopped it
-> never blocked a single request. It just disarmed the attack and let the AI
-> refuse on its own."**
+> **"Our best attack went from 97.9% to zero. We thought our prefill guard did it —
+> so we ablated the attack, and found the plain instruction still scores 96%
+> on its own. The hardened system prompt is what actually stopped it.
+> We tested our own assumption and it was wrong."**
+
+That is a stronger thing to say than a clean success, and it is defensible because
+the ablation is in the transcript.
 
 ---
 
