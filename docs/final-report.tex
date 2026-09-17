@@ -133,7 +133,7 @@
 \section{What Was Built and How It Was Run}
 % =====================================================================
 
-The tool is a jailbreak battery of twenty prompt-transformation techniques and a six-layer
+The tool is a jailbreak battery of twenty prompt-transformation techniques (17 after a post-evaluation trim) and a six-layer
 defense stack, joined by one harness so that both can be measured against the same target
 under the same seed.
 
@@ -150,6 +150,22 @@ Evidence & append-only JSONL under \texttt{logs/<run-id>/}, committed to the rep
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{findingbox}
+\textbf{Battery size: measured with 20, shipped with 17.} After the evaluation, three
+techniques were retired --- \texttt{aim}, \texttt{base64} and \texttt{rot13} --- and the
+reasoning is recorded in \texttt{docs/DROPPED-ATTACKS.md}. All three scored $\approx$0\%,
+but for two different reasons, and only one of them is about the defense. \texttt{aim}
+drew clean refusals: persona attacks are a solved problem for this model, so they cannot
+discriminate between defenses already at 0\%. \texttt{base64} and \texttt{rot13} drew
+\emph{no} refusals at all --- the victim could not decode them --- so each trial measured
+the target's capability rather than its safety or our stack.
+
+Every number in this report comes from runs that \emph{included} all three; they are
+reported here and retained in the transcripts. Retiring them does not weaken Layer~1.5,
+which was built to catch base64: \texttt{combination\_1/2/3} still embed a base64 payload,
+and L1.5 catches those 25/25 apiece.
+\end{findingbox}
 
 \paragraph{Reproducing a run.} Seed 1337; every model revision pinned to a resolved Hugging Face commit; the harmful set is a seeded 50-row AdvBench sample rebuilt by \texttt{datasets/build\_harmful.py}.
 
