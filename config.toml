@@ -20,14 +20,14 @@ seed = 1337                       # global RNG seed: random / numpy / torch
 
 [models.target]                   # the "victim": attacked by the battery, protected by the stack
 name           = "Qwen/Qwen2.5-7B-Instruct"   # 7B: capable enough to actually run the cipher + persona attacks
-revision       = "PIN-ME"         # m4c_baseline_7b.ipynb prints the current hash
+revision       = "a09a35458c702b33eeacc393d103063234e8bc28"
 backend        = "transformers"   # fake | transformers | ollama
 device         = "auto"           # shard across both T4s -- fp16 7B is ~15 GB, too big for one card
-max_memory     = { 0 = "14GiB", 1 = "4GiB" }   # cuda:1 budget for the DEFENDED pass (M5), which
-                                  # holds four models at once: target spill (<=4) + judge nf4 (~6)
-                                  # + gpt2-large scorer (~2) + paraphraser nf4 (~1.2) ~= 13 GB,
-                                  # leaving headroom on a 16 GB T4. Was 7GiB for the M4 baseline,
-                                  # when only the judge and scorer shared GPU 1.
+max_memory     = { 0 = "14GiB", 1 = "7GiB" }   # DO NOT LOWER. At 4GiB the 15.2 GB fp16 model had
+                                  # too little headroom once 3 more models shared cuda:1 and
+                                  # transformers disk-offloaded part of it: 0.78 tok/s vs 2.73 here,
+                                  # which is what ran the M5 session into Kaggle's 12h cap.
+                                  # Room is made by keeping the scorer on CPU instead (see below).
 dtype          = "auto"           # auto -> bf16 if the GPU supports it (RTX 6000), else fp16 (T4)
 max_new_tokens = 256              # enough to judge compliance; ~2x faster than 512 over 800 trials
 temperature    = 0.0              # greedy -> deterministic transcripts
@@ -37,7 +37,7 @@ top_p          = 1.0
 
 [models.helper]                   # helper LM for model-assisted attacks (auto_payload_splitting, auto_obfuscation)
 name           = "Qwen/Qwen2.5-7B-Instruct"   # same name as the target -> reuses the loaded weights, 0 extra VRAM
-revision       = "PIN-ME"
+revision       = "a09a35458c702b33eeacc393d103063234e8bc28"
 backend        = "transformers"   # was "fake": the auto_* attacks were fed placeholder text and their ASR was meaningless
 device         = "auto"           # must match the target so the model cache hits
 max_memory     = { 0 = "14GiB", 1 = "7GiB" }
@@ -52,7 +52,7 @@ name           = "Qwen/Qwen2.5-1.5B-Instruct"   # was zephyr-7b-beta: a 2nd 7B d
                                   # Jain et al.'s cross-family setup. Acceptable here because
                                   # our battery is hand-written, not optimised against the
                                   # paraphraser, so shared tokenisation is not an attack surface.
-revision       = "PIN-ME"         # m5_defended_asr.ipynb prints the current hash
+revision       = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
 backend        = "transformers"
 device         = "cuda:1"
 quant          = "4bit"           # nf4 -- ~1.2 GB, rides along with the judge on GPU 1
@@ -65,7 +65,9 @@ instruction    = "paraphrase the following sentences:"   # fixed wording, from J
 name           = "openai-community/gpt2-large"   # GPT-2 (2019), open weights, MIT licence
 revision       = "32b71b12589c2f8d625668d2335a01cac3249519"   # pinned via m3_calibrate_layer1.ipynb
 backend        = "transformers"   # fake | transformers
-device         = "cuda:1"         # small (~2 GB) -- rides along with the judge on GPU 1
+device         = "cpu"            # moved off GPU so cuda:1 is not contended: L1 only scores the
+dtype          = "float32"        # prompt (~100 tokens), so CPU costs well under a second per
+                                  # trial, and it buys back the headroom the 7B target needs.
 
 [models.judge]                    # defense Layer 4 + automated grader (BAD_BOT / GOOD_BOT / UNCLEAR)
 name           = "Qwen/Qwen3.5-9B"   # official (Feb 2026), Apache-2.0; different family+gen from the target
