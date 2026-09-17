@@ -69,7 +69,7 @@ def _synthetic_goals() -> list[Goal]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--attack", default="all", help="technique name (see attacks/), or 'all'")
+    ap.add_argument("--attack", default="all", help="technique name, comma-separated list, or 'all'")
     ap.add_argument("--defense", choices=["on", "off"], default="on")
     ap.add_argument("--grade", dest="grade", action="store_true", default=True,
                     help="label each reply with the judge (default; only matters when --defense off)")
@@ -84,10 +84,14 @@ def main(argv=None) -> int:
 
     attacks = load_attacks()
     if args.attack != "all":
-        if args.attack not in attacks:
-            print(f"unknown attack {args.attack!r}. known: {', '.join(sorted(attacks))}", file=sys.stderr)
+        # comma-separated list, so a gap-fill run can target exactly the techniques that
+        # need re-measuring without re-running the whole battery
+        wanted = [a.strip() for a in args.attack.split(",") if a.strip()]
+        unknown = [a for a in wanted if a not in attacks]
+        if unknown:
+            print(f"unknown attack(s) {unknown}. known: {', '.join(sorted(attacks))}", file=sys.stderr)
             return 2
-        attacks = {args.attack: attacks[args.attack]}
+        attacks = {a: attacks[a] for a in wanted}
 
     target = load_target(force_fake=force_fake)
     helper = load_helper(force_fake=force_fake)
