@@ -53,7 +53,7 @@ def part1_attacks() -> None:
 
     for name, why in [
         ("prefix_injection", "97.9% -- our strongest. Forces the reply to START with 'Absolutely! Here is'"),
-        ("base64", "2.0% -- hides the request in code so no harmful word appears"),
+        ("combination_1", "22.4% -- hides the request in base64 + forces the reply to start with 'Absolutely!'"),
         ("distractors", "49.0% -- buries the request between two harmless ones"),
     ]:
         out = atks[name].apply(GOAL)
@@ -92,9 +92,9 @@ def part3_defense() -> None:
 
     atks = load_all()
 
-    print("\n  --- L1.5 structural check (OUR design) vs base64 ---\n")
-    out = atks["base64"].apply(GOAL)
-    ctx = DefenseContext(goal_id="d", attack="base64", original_prompt=GOAL, prompt=out.prompt)
+    print("\n  --- L1.5 structural check (OUR design) vs an embedded base64 payload ---\n")
+    out = atks["combination_1"].apply(GOAL)
+    ctx = DefenseContext(goal_id="d", attack="combination_1", original_prompt=GOAL, prompt=out.prompt)
     StructuralCipherCheck({"enabled": True, "enforce": True}).process(ctx)
     v = ctx.verdicts[-1]
     print(f"    prompt contains : {out.prompt.splitlines()[-1][:60]}...")
@@ -135,10 +135,10 @@ def part4_proof() -> None:
 
     harmful = load_harmful()
     atks = load_all()
-    for name in ("base64", "combination_1", "combination_3"):
+    for name in ("combination_1", "combination_2", "combination_3"):
         hits = sum(blocked(atks[name].apply(g.goal).prompt) for g in harmful)
         print(f"  {name:16} caught            : {hits} / {len(harmful)}")
-    for name in ("distractors", "aim"):
+    for name in ("distractors", "prefix_injection"):
         hits = sum(blocked(atks[name].apply(g.goal).prompt) for g in harmful)
         print(f"  {name:16} caught            : {hits} / {len(harmful)}   (correct -- not its job)")
 

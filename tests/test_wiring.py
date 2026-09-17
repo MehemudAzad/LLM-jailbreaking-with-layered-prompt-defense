@@ -10,7 +10,7 @@ from defense import build_pipeline
 
 def test_every_attack_registers_with_a_known_category():
     attacks = load_all()
-    assert {"passthrough", "base64", "prefix_injection", "refusal_suppression"} <= set(attacks)
+    assert {"passthrough", "leetspeak", "prefix_injection", "refusal_suppression"} <= set(attacks)
     for name, atk in attacks.items():
         assert atk.category in CATEGORIES, f"{name}: bad category {atk.category!r}"
 
