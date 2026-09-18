@@ -32,3 +32,11 @@ logs/*
 !logs/README.md
 
 datasets
+# LaTeX build artifacts (the .tex sources and the built PDF are tracked)
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
