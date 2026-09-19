@@ -249,6 +249,7 @@ project-406/
 │   └── README.md               # Complete cross-model comparative report & analysis
 ├── docs/
 │   ├── ATTACKS-EXPLAINED.md    # Deep technical guide for all 17 attacks & viva prep
+│   ├── DEFENSE-EXPLAINED.md    # Deep technical guide for the 6-layer defense & viva prep
 │   ├── report/                 # Final Report (LaTeX source, PDF) & PRESENTATION.md
 │   │   ├── final-report.tex / pdf # Formal Course Final Report
 │   │   └── PRESENTATION.md     # 5-step viva voce presentation walkthrough script
